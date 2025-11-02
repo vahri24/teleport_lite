@@ -1,0 +1,17 @@
+{{define "title"}}Users{{end}}
+{{template "layout.tmpl" .}}
+{{define "content"}}
+<h1>Users</h1>
+<table>
+  <thead><tr><th>Email</th><th>Name</th><th>Roles</th></tr></thead>
+  <tbody>
+    {{range .Users}}
+    <tr>
+      <td>{{.Email}}</td>
+      <td>{{.Name}}</td>
+      <td>{{range .Roles}}{{.Name}} {{end}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}

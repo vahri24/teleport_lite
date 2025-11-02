@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>{{block "title" .}}Teleport Lite{{end}}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link href="/static/base.css" rel="stylesheet"/>
+</head>
+<body>
+  <nav>
+    <a href="/">Dashboard</a>
+    <a href="/users">Users</a>
+    <a href="/roles">Roles</a>
+  </nav>
+  <main>
+    {{block "content" .}}{{end}}
+  </main>
+</body>
+</html>

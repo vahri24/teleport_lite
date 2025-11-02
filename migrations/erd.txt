@@ -1,0 +1,57 @@
++------------------+         +------------------+        +------------------+
+| users            |         | roles            |        | permissions      |
+|------------------|         |------------------|        |------------------|
+| id (PK)          |   +---> | id (PK)          |  +---> | id (PK)          |
+| org_id (FK)      |   |     | org_id (FK)      |  |     | key (UNIQUE)     |
+| email (UNIQUE)   |   |     | name             |  |     | description      |
+| name             |   |     | slug (UNIQUE*)   |  |     | resource         |
+| auth_provider    |   |     | description      |  |     | action           |
+| password_hash    |   |     | is_system (bool) |  |     | created_at       |
+| status           |   |     | created_at       |  |     | updated_at       |
+| created_at       |   |     | updated_at       |  |     +------------------+
+| updated_at       |   |     +------------------+  |
++------------------+   |                          |
+                       |  +-----------------------+ v
+                       |  | role_permissions      |
+                       |  |-----------------------|
+                       +--| role_id (FK)          |
+                          | permission_id (FK)    |
+                          | UNIQUE(role_id,permission_id)
+                          +-----------------------+
+
++------------------+          +----------------------+
+| user_roles       |          | organizations        |
+|------------------|          |----------------------|
+| user_id (FK)     |   +----> | id (PK)              |
+| role_id (FK)     |   |      | name                 |
+| org_id (FK)      | --+      | slug (UNIQUE)        |
+| UNIQUE(user_id,role_id,org_id)  | created_at      |
++------------------+          | updated_at          |
+                              +----------------------+
+
++------------------+          +----------------------+
+| resources        |          | access_rules         |
+|------------------|          |----------------------|
+| id (PK)          |   +----> | id (PK)              |
+| org_id (FK)      |   |      | org_id (FK)          |
+| name             |   |      | resource_id (FK)     |
+| type             |   |      | role_id (FK)         |
+| external_ref     |   |      | permission_id (FK)   |
+| metadata (JSON)  |   |      | constraint_expr TEXT |
+| created_at       |   |      | created_at           |
+| updated_at       |   |      | updated_at           |
++------------------+   |      +----------------------+
+                       |
++------------------+   |
+| audit_logs       |   |
+|------------------|   |
+| id (PK)          |   |
+| org_id (FK)      |   |
+| user_id (FK)     |   |
+| action           |   |
+| resource_type    |   |
+| resource_id      |   |
+| metadata (JSON)  |   |
+| ip, user_agent   |   |
+| created_at       |   |
++------------------+   +
