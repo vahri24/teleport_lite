@@ -1,0 +1,116 @@
+{{ define "resources_content" }}
+<section class="min-h-screen">
+  <div class="max-w-6xl mx-auto px-4">
+    
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-3">
+        <h1 class="text-2xl font-semibold text-slate-800">Resources</h1>
+        <a href="/dashboard"
+          class="px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition shadow-sm">
+          ← Back to Dashboard
+        </a>
+    </div>
+      <div class="flex gap-2">
+        <button id="refreshResources"
+          class="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow transition">
+          ↻ Refresh
+        </button>
+        <button id="showAddResource"
+          class="px-3 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg shadow transition">
+          ➕ Add Resource
+        </button>
+      </div>
+    </div>
+
+    <!-- Search -->
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <input type="text" id="searchResource"
+        class="w-full sm:w-1/2 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+        placeholder="Search resources..." />
+    </div>
+
+    <!-- Resource Grid -->
+    <div id="resourcesGrid"
+      class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      <!-- Cards dynamically rendered by app.js -->
+      <div class="col-span-full text-center text-slate-400 text-sm">Loading resources...</div>
+    </div>
+  </div>
+
+  <!-- Add Resource Modal -->
+  <div id="addResourceModal"
+    class="hidden fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+      <h2 class="text-lg font-semibold text-slate-800 mb-4">Add New Resource</h2>
+      <form id="addResourceForm" class="space-y-4">
+        <div>
+          <label class="block text-sm mb-1 text-slate-700">Name</label>
+          <input type="text" name="name"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            placeholder="Server name" required />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm mb-1 text-slate-700">Host/IP</label>
+            <input type="text" name="host"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="192.168.1.10" required />
+          </div>
+          <div>
+            <label class="block text-sm mb-1 text-slate-700">Port</label>
+            <input type="number" name="port"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="22" value="22" required />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm mb-1 text-slate-700">User</label>
+          <input type="text" name="user"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            placeholder="ubuntu" required />
+        </div>
+
+        <div>
+          <label class="block text-sm mb-1 text-slate-700">Description</label>
+          <textarea name="description"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            placeholder="Development or production server..."></textarea>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" id="cancelAddResource"
+            class="px-3 py-2 rounded-lg bg-slate-200 text-slate-700 text-sm hover:bg-slate-300">
+            Cancel
+          </button>
+          <button type="submit"
+            class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">
+            Save
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- SSH Terminal Modal -->
+<div id="sshModal"
+     class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-xl w-[95%] max-w-5xl p-4">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold">SSH Session</h2>
+      <button id="closeSSH"
+              class="px-3 py-1.5 rounded bg-slate-200 hover:bg-slate-300">
+        Close
+      </button>
+    </div>
+    <div id="terminal"
+         class="h-[70vh] w-full rounded-lg border border-slate-200 overflow-hidden bg-slate-900 text-white">
+    </div>
+  </div>
+</div>
+{{ end }}
+
+{{ template "layout" . }}

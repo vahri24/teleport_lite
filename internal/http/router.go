@@ -40,6 +40,13 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
     	})
 	})
 
+	// ✅ Resource (PUBLIC PAGE for now so redirect works)
+	r.GET("/resources", func(c *gin.Context) {
+	c.HTML(http.StatusOK, "resources.tmpl", gin.H{
+		"title": "Resources",
+	})
+})
+
 
 	// Public routes
 	r.POST("/api/v1/auth/login", handlers.LoginHandler(db, jwtSecret))
@@ -63,7 +70,11 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 
 		// Resources
 		api.GET("/resources", require(chk, "resources:read"), listResources(db))
+		api.GET("/resources/local", require(chk, "resources:read"), handlers.GetLocalResource)
 		api.POST("/resources", require(chk, "resources:write"), createResource(db))
+
+		//SSH
+		api.GET("/ws/ssh", handlers.SSHWS)
 
 		// Audit Trail
 		api.GET("/audit", require(chk, "audit:read"), listAudit(db))

@@ -1,62 +1,67 @@
-// internal/ui/static/app.js
-
+// --------------------------- MAIN APP ENTRY --------------------------- //
 document.addEventListener("DOMContentLoaded", () => {
   console.log("🚀 app.js loaded");
 
-  const onDashboard = window.location.pathname === "/dashboard";
+  const path = window.location.pathname;
+  const onDashboard = path === "/dashboard";
+  const onResources = path === "/resources";
 
-  // If user is on dashboard, check if token cookie exists
-  if (onDashboard) {
-    checkDashboardAccess();
-  }
+  // Protect dashboard and resources routes
+  if (onDashboard || onResources) checkAuth();
 
-  // Handle login form
+  // Login handler
   const loginForm = document.getElementById("loginForm");
-  if (loginForm) {
-    loginForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
+  if (loginForm) loginForm.addEventListener("submit", handleLogin);
 
-      const formData = new FormData(loginForm);
-      const payload = Object.fromEntries(formData.entries());
-
-      try {
-        const res = await fetch("/api/v1/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          credentials: "include", // ✅ store cookie
-        });
-
-        const data = await res.json();
-        console.log("Login response:", data);
-
-        if (res.ok && data.token) {
-          console.log("✅ Login successful!");
-          window.location.href = "/dashboard";
-        } else {
-          alert("❌ Login failed: " + (data.error || "Invalid credentials"));
-        }
-      } catch (err) {
-        console.error("⚠️ Login error:", err);
-        alert("Network error, please check console");
-      }
-    });
-  }
-
-  // Setup logout + user menu
+  // Logout & dropdown menu
   setupLogout();
   setupUserMenu();
 
-  // Load dashboard data if on dashboard
+  // Dashboard loaders
   if (onDashboard) {
     loadTable("/api/v1/roles", "rolesTable", 3);
     loadTable("/api/v1/resources", "resourcesTable", 4);
     loadTable("/api/v1/audit", "auditTable", 5);
   }
+
+  // Resources page handlers
+  if (onResources) {
+    console.log("🔌 Loading real local resources...");
+    loadLocalResources();
+    setupAddResourceModal();
+  }
 });
 
-// ----------- Auth Guard for Dashboard -----------
-async function checkDashboardAccess() {
+// --------------------------- LOGIN HANDLER --------------------------- //
+async function handleLogin(e) {
+  e.preventDefault();
+
+  const formData = new FormData(e.target);
+  const payload = Object.fromEntries(formData.entries());
+
+  try {
+    const res = await fetch("/api/v1/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      credentials: "include",
+    });
+
+    const data = await res.json();
+    if (res.ok && data.token) {
+      console.log("✅ Login successful");
+      window.location.href = "/dashboard";
+    } else {
+      alert("❌ Login failed: " + (data.error || "Invalid credentials"));
+    }
+  } catch (err) {
+    console.error("⚠️ Login error:", err);
+    alert("Network error");
+  }
+}
+
+// --------------------------- AUTH GUARD --------------------------- //
+async function checkAuth() {
   try {
     const res = await fetch("/api/v1/roles", { credentials: "include" });
     if (res.status === 401) {
@@ -69,7 +74,7 @@ async function checkDashboardAccess() {
   }
 }
 
-// ----------- Dynamic Table Loader -----------
+// --------------------------- DASHBOARD TABLES --------------------------- //
 async function loadTable(apiPath, tableId, columns) {
   try {
     const res = await fetch(apiPath, { credentials: "include" });
@@ -88,16 +93,16 @@ async function loadTable(apiPath, tableId, columns) {
 
     table.innerHTML = records
       .map(
-        (r) =>
-          `<tr class="border-b last:border-0">
-            ${Object.values(r)
-              .slice(0, columns)
-              .map(
-                (v) =>
-                  `<td class="py-2 px-2 whitespace-nowrap text-slate-700">${v ?? "-"}</td>`
-              )
-              .join("")}
-          </tr>`
+        (r) => `
+        <tr class="border-b last:border-0">
+          ${Object.values(r)
+            .slice(0, columns)
+            .map(
+              (v) =>
+                `<td class="py-2 px-2 whitespace-nowrap text-slate-700">${v ?? "-"}</td>`
+            )
+            .join("")}
+        </tr>`
       )
       .join("");
   } catch (err) {
@@ -105,19 +110,168 @@ async function loadTable(apiPath, tableId, columns) {
   }
 }
 
-// ----------- Logout + User Menu -----------
+// --------------------------- RESOURCES: LOAD LOCAL INSTANCE --------------------------- //
+async function loadLocalResources() {
+  const grid = document.getElementById("resourcesGrid");
+  if (!grid) return;
+
+  try {
+    const res = await fetch("/api/v1/resources/local", { credentials: "include" });
+    const data = await res.json();
+
+    if (!data.resources || data.resources.length === 0) {
+      grid.innerHTML = `<p class="text-slate-400 text-center">No local resources found</p>`;
+      return;
+    }
+
+    grid.innerHTML = data.resources
+      .map(
+        (r) => `
+        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <h3 class="text-slate-800 font-semibold">${r.name}</h3>
+              <p class="text-xs text-slate-500">${r.host}:${r.port}</p>
+            </div>
+            <button class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg connect-btn"
+                    data-host="${r.host}"
+                    data-user="${r.user}">
+              Connect
+            </button>
+          </div>
+          <p class="text-xs text-slate-600">${r.user} • ${r.description}</p>
+        </div>
+      `
+      )
+      .join("");
+
+    // Attach connect handlers
+    document.querySelectorAll(".connect-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const host = e.currentTarget.dataset.host;
+        const user = e.currentTarget.dataset.user;
+        openSSH(host, user);
+      });
+    });
+  } catch (err) {
+    console.error("Error loading local resources:", err);
+    grid.innerHTML = `<p class="text-red-500 text-center">Failed to load resources</p>`;
+  }
+}
+
+// --------------------------- SSH CONNECT MODAL --------------------------- //
+function openSSH(host, user) {
+  const modal = document.getElementById("sshModal");
+  const closeBtn = document.getElementById("closeSSH");
+  const termEl = document.getElementById("terminal");
+
+  modal.classList.remove("hidden");
+  termEl.innerHTML = "";
+
+  const term = new Terminal({
+    cursorBlink: true,
+    convertEol: true,
+    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+    fontSize: 14,
+    theme: { background: "#0b1221", foreground: "#e5e7eb" },
+  });
+
+  const fit = new window.FitAddon.FitAddon();
+  term.loadAddon(fit);
+  term.open(termEl);
+  fit.fit();
+
+  const password = prompt(`🔐 Password for ${user}@${host}`);
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const url = `${proto}://${location.host}/api/v1/ws/ssh?host=${encodeURIComponent(
+    host
+  )}&port=22&user=${encodeURIComponent(user)}`;
+
+  const ws = new WebSocket(url);
+  ws.binaryType = "arraybuffer";
+
+  ws.onopen = () => {
+    const cols = term.cols || 120;
+    const rows = term.rows || 32;
+    ws.send(JSON.stringify({ op: "auth", password, cols, rows }));
+  };
+
+  ws.onmessage = (ev) => {
+    if (ev.data instanceof ArrayBuffer) {
+      term.write(new Uint8Array(ev.data));
+    } else {
+      term.write(String(ev.data));
+    }
+  };
+
+  ws.onclose = () => term.write("\r\n\x1b[33m[Disconnected]\x1b[0m\r\n");
+  ws.onerror = () => term.write("\r\n\x1b[31m[WebSocket error]\x1b[0m\r\n");
+
+  term.onData((data) => {
+    if (ws.readyState === WebSocket.OPEN)
+      ws.send(new TextEncoder().encode(data));
+  });
+
+  window.addEventListener("resize", () => fit.fit());
+  closeBtn.onclick = () => {
+    try { ws.close(); } catch {}
+    modal.classList.add("hidden");
+  };
+}
+
+// --------------------------- ADD RESOURCE MODAL --------------------------- //
+function setupAddResourceModal() {
+  const modal = document.getElementById("addResourceModal");
+  const showBtn = document.getElementById("showAddResource");
+  const cancelBtn = document.getElementById("cancelAddResource");
+  const form = document.getElementById("addResourceForm");
+
+  if (showBtn && modal) showBtn.addEventListener("click", () => modal.classList.remove("hidden"));
+  if (cancelBtn && modal) cancelBtn.addEventListener("click", () => modal.classList.add("hidden"));
+
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      const payload = Object.fromEntries(formData.entries());
+
+      try {
+        const res = await fetch("/api/v1/resources", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          console.log("✅ Resource added:", data);
+          form.reset();
+          modal.classList.add("hidden");
+          loadLocalResources();
+        } else {
+          alert("❌ Failed: " + data.error);
+        }
+      } catch (err) {
+        console.error("Error adding resource:", err);
+      }
+    });
+  }
+}
+
+// --------------------------- LOGOUT HANDLER --------------------------- //
 function setupLogout() {
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
-    logoutBtn.addEventListener("click", async () => {
-      // Delete token cookie via backend (optional) or client-side redirect
+    logoutBtn.addEventListener("click", () => {
       alert("👋 Logged out successfully!");
-      document.cookie = "token=; Max-Age=0; path=/"; // clear cookie
+      document.cookie = "token=; Max-Age=0; path=/";
       window.location.href = "/login";
     });
   }
 }
 
+// --------------------------- USER DROPDOWN --------------------------- //
 function setupUserMenu() {
   const btn = document.getElementById("userMenuBtn");
   const dropdown = document.getElementById("menuDropdown");
@@ -127,36 +281,6 @@ function setupUserMenu() {
       e.stopPropagation();
       dropdown.classList.toggle("hidden");
     });
-
-    window.addEventListener("click", () => {
-      dropdown.classList.add("hidden");
-    });
+    window.addEventListener("click", () => dropdown.classList.add("hidden"));
   }
 }
-
-
-// ----------- Refresh Buttons for Dashboard -----------
-
-document.addEventListener("DOMContentLoaded", () => {
-  const refreshRoles = document.getElementById("refreshRoles");
-  const refreshResources = document.getElementById("refreshResources");
-  const refreshAudit = document.getElementById("refreshAudit");
-
-  if (refreshRoles)
-    refreshRoles.addEventListener("click", () => {
-      console.log("Refreshing roles...");
-      loadTable("/api/v1/roles", "rolesTable", 3);
-    });
-
-  if (refreshResources)
-    refreshResources.addEventListener("click", () => {
-      console.log("Refreshing resources...");
-      loadTable("/api/v1/resources", "resourcesTable", 4);
-    });
-
-  if (refreshAudit)
-    refreshAudit.addEventListener("click", () => {
-      console.log("Refreshing audit logs...");
-      loadTable("/api/v1/audit", "auditTable", 5);
-    });
-});

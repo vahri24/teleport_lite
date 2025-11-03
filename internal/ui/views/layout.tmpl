@@ -6,54 +6,71 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ .title }}</title>
 
-  <!-- Tailwind via CDN -->
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- App logic -->
+  <!-- Xterm (for SSH Terminal) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+
+  <!-- Custom App JS -->
   <script defer src="/static/app.js"></script>
 </head>
+
 <body class="bg-slate-50 text-slate-800">
   <!-- Header -->
-  <header class="bg-blue-600 text-white">
-    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-      <h1 class="text-xl font-semibold tracking-wide">Teleport Lite</h1>
+  <header class="bg-blue-600 text-white shadow">
+    <div class="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
+      <!-- Left: App name -->
+      <a href="/dashboard" class="text-lg font-semibold tracking-wide hover:opacity-90">
+        Teleport Lite
+      </a>
 
-      <!-- Right section -->
-      <div class="flex items-center space-x-4">
-        {{ if eq .title "Dashboard" }}
-        <div class="relative" id="userMenu">
-          <button id="userMenuBtn" class="flex items-center space-x-2 hover:bg-blue-500 px-3 py-1.5 rounded-lg transition">
-            <span class="text-sm font-medium" id="userNameDisplay">User</span>
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <!-- Dropdown -->
-          <div id="menuDropdown" class="hidden absolute right-0 mt-2 w-40 bg-white text-slate-700 rounded-lg shadow-lg border border-slate-200">
-            <button id="logoutBtn" class="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 rounded-t-lg">Logout</button>
-            <a href="/login" class="block px-4 py-2 text-sm hover:bg-blue-50 rounded-b-lg">Switch Account</a>
-          </div>
+      <!-- Right: User Menu -->
+      {{ if or (eq .title "Dashboard") (eq .title "Resources") }}
+      <div class="relative" id="userMenu">
+        <button id="userMenuBtn"
+                class="flex items-center space-x-2 bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded-lg text-sm transition">
+          <span id="userNameDisplay">User</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        <!-- Dropdown -->
+        <div id="menuDropdown"
+             class="hidden absolute right-0 mt-2 w-40 bg-white text-slate-700 rounded-lg shadow-lg border border-slate-200 z-50">
+          <button id="logoutBtn"
+                  class="w-full text-left px-4 py-2 text-sm hover:bg-blue-50">Logout</button>
+          <a href="/login"
+             class="block px-4 py-2 text-sm hover:bg-blue-50 rounded-b-lg">Switch Account</a>
         </div>
-        {{ end }}
       </div>
+      {{ end }}
     </div>
   </header>
 
-  <!-- Page content -->
+  <!-- Main Page Content -->
   <main class="max-w-6xl mx-auto px-4 py-8">
     {{ if eq .title "Login" }}
       {{ template "login_content" . }}
     {{ else if eq .title "Dashboard" }}
       {{ template "dashboard_content" . }}
+    {{ else if eq .title "Resources" }}
+      {{ template "resources_content" . }}
     {{ else }}
       <div class="p-6 bg-white rounded-2xl shadow">
-        <p class="text-sm text-slate-500">Page not found or missing template content.</p>
+        <p class="text-sm text-slate-500">
+          Page not found or missing template content.
+        </p>
       </div>
     {{ end }}
   </main>
 
+  <!-- Footer -->
   <footer class="py-6 text-center text-xs text-slate-400">
-    Built with Go · Gin · Tailwind
+    Built with Go · Gin · Tailwind · xterm.js
   </footer>
 </body>
 </html>
