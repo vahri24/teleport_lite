@@ -8,6 +8,10 @@ import (
 
 type Checker struct { DB *gorm.DB }
 
+func NewChecker(db *gorm.DB) *Checker {
+	return &Checker{DB: db}
+}
+
 func (c Checker) Can(ctx context.Context, userID, orgID uint64, permKey string) (bool, error) {
     // JOIN user_roles -> roles -> role_permissions -> permissions by `key`
     var count int64

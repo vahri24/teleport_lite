@@ -1,25 +1,94 @@
-{{ define "content" }}
-<h2>Dashboard</h2>
+{{ define "dashboard_content" }}
 
-<div class="card">
-  <p>Welcome, {{ .name }} 🎉</p>
-  <p>Organization ID: {{ .org_id }}</p>
+<!-- Welcome Section -->
+<div class="bg-white rounded-2xl shadow p-6 md:p-8 mb-6">
+  <h2 class="text-2xl font-semibold mb-2">Dashboard</h2>
+  <p class="text-slate-600">Welcome, <span class="font-medium">{{ .name }}</span> 🎉</p>
+  <p class="text-slate-500 text-sm">Organization ID: {{ .org_id }}</p>
 </div>
 
-<div class="card">
-  <h3>Quick Navigation</h3>
-  <ul>
-    <li><a href="/api/v1/users" target="_blank">👤 View Users (API)</a></li>
-    <li><a href="/api/v1/roles" target="_blank">🧩 View Roles (API)</a></li>
-    <li><a href="/api/v1/resources" target="_blank">📦 View Resources (API)</a></li>
-    <li><a href="/api/v1/audit" target="_blank">📜 View Audit Trail (API)</a></li>
+<!-- Quick Nav -->
+<div class="bg-white rounded-2xl shadow p-6 mb-8">
+  <h3 class="text-lg font-semibold mb-4">Quick Navigation</h3>
+  <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+    <li><a class="block rounded-xl border border-slate-200 px-4 py-3 hover:border-blue-400 hover:bg-blue-50 transition" href="/api/v1/users" target="_blank">👤 Users (API)</a></li>
+    <li><a class="block rounded-xl border border-slate-200 px-4 py-3 hover:border-blue-400 hover:bg-blue-50 transition" href="/api/v1/roles" target="_blank">🧩 Roles (API)</a></li>
+    <li><a class="block rounded-xl border border-slate-200 px-4 py-3 hover:border-blue-400 hover:bg-blue-50 transition" href="/api/v1/resources" target="_blank">📦 Resources (API)</a></li>
+    <li><a class="block rounded-xl border border-slate-200 px-4 py-3 hover:border-blue-400 hover:bg-blue-50 transition" href="/api/v1/audit" target="_blank">📜 Audit Trail (API)</a></li>
   </ul>
 </div>
 
-<div class="card">
-  <h3>Summary</h3>
-  <p>This dashboard is the central control panel of <strong>Teleport Lite</strong> —  
-     use the links above to inspect users, roles, resources, and logs directly via your REST API.</p>
+<!-- Live Data (with refresh buttons) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+  <!-- Roles -->
+  <div class="bg-white rounded-2xl shadow p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold">Roles</h3>
+      <button id="refreshRoles" class="text-blue-600 text-sm hover:underline">↻ Refresh</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="text-left text-slate-500 border-b">
+            <th class="py-2 pr-4">ID</th>
+            <th class="py-2 pr-4">Name</th>
+            <th class="py-2 pr-4">Slug</th>
+          </tr>
+        </thead>
+        <tbody id="rolesTable">
+          <tr><td colspan="3" class="py-4 text-slate-400">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Resources -->
+  <div class="bg-white rounded-2xl shadow p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold">Resources</h3>
+      <button id="refreshResources" class="text-blue-600 text-sm hover:underline">↻ Refresh</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="text-left text-slate-500 border-b">
+            <th class="py-2 pr-4">ID</th>
+            <th class="py-2 pr-4">Name</th>
+            <th class="py-2 pr-4">Type</th>
+            <th class="py-2 pr-4">External Ref</th>
+          </tr>
+        </thead>
+        <tbody id="resourcesTable">
+          <tr><td colspan="4" class="py-4 text-slate-400">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Audit Trail (full width) -->
+  <div class="md:col-span-2 bg-white rounded-2xl shadow p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold">Audit Trail</h3>
+      <button id="refreshAudit" class="text-blue-600 text-sm hover:underline">↻ Refresh</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="text-left text-slate-500 border-b">
+            <th class="py-2 pr-4">ID</th>
+            <th class="py-2 pr-4">User ID</th>
+            <th class="py-2 pr-4">Action</th>
+            <th class="py-2 pr-4">Resource</th>
+            <th class="py-2 pr-4">Created At</th>
+          </tr>
+        </thead>
+        <tbody id="auditTable">
+          <tr><td colspan="5" class="py-4 text-slate-400">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
+
 {{ end }}
 {{ template "layout" . }}
