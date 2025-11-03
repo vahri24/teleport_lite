@@ -3,8 +3,8 @@ package models
 import "time"
 
 type Role struct {
-    ID          uint64    `gorm:"primaryKey"`
-    OrgID       uint64    `gorm:"index"`
+    ID          int64    `gorm:"primaryKey"`
+    OrgID       int64    `gorm:"index"`
     Name        string    `gorm:"size:200;not null"`
     Slug        string    `gorm:"size:200;not null"`
     Description string

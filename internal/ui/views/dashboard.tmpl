@@ -1,0 +1,25 @@
+{{ define "content" }}
+<h2>Dashboard</h2>
+
+<div class="card">
+  <p>Welcome, {{ .name }} 🎉</p>
+  <p>Organization ID: {{ .org_id }}</p>
+</div>
+
+<div class="card">
+  <h3>Quick Navigation</h3>
+  <ul>
+    <li><a href="/api/v1/users" target="_blank">👤 View Users (API)</a></li>
+    <li><a href="/api/v1/roles" target="_blank">🧩 View Roles (API)</a></li>
+    <li><a href="/api/v1/resources" target="_blank">📦 View Resources (API)</a></li>
+    <li><a href="/api/v1/audit" target="_blank">📜 View Audit Trail (API)</a></li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3>Summary</h3>
+  <p>This dashboard is the central control panel of <strong>Teleport Lite</strong> —  
+     use the links above to inspect users, roles, resources, and logs directly via your REST API.</p>
+</div>
+{{ end }}
+{{ template "layout" . }}

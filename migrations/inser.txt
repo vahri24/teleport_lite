@@ -1,0 +1,13 @@
+INSERT INTO organizations (name, slug) VALUES ('Default Organization', 'default');
+
+INSERT INTO roles (org_id,name,slug) VALUES (1,'Admin','admin'), (1,'DevOps','devops'), (1,'ReadOnly','readonly');
+
+INSERT INTO permissions (`key`,description,resource,action) VALUES
+('users:read','List and view users','users','read'),
+('users:write','Create/modify users','users','write'),
+('users:assign-role','Assign roles to users','users','assign-role'),
+('roles:read','List and view roles','roles','read'),
+('roles:write','Create/modify roles','roles','write'),
+('resources:read','List and view resources','resources','read'),
+('resources:write','Create/modify resources','resources','write'),
+('audit:read','View audit logs','audit','read');

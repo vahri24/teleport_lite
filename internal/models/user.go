@@ -9,8 +9,8 @@ const (
 )
 
 type User struct {
-    ID           uint64     `gorm:"primaryKey"`
-    OrgID        uint64     `gorm:"index"`
+    ID           int64     `gorm:"primaryKey"`
+    OrgID        int64     `gorm:"index"`
     Email        string     `gorm:"uniqueIndex;size:255;not null"`
     Name         string     `gorm:"size:200"`
     AuthProvider string     `gorm:"size:20;default:local"`

@@ -1,0 +1,14 @@
+{{ define "content" }}
+<h2>Login</h2>
+<form id="loginForm">
+  <label>Email</label>
+  <input type="text" name="email" placeholder="you@example.com" required />
+
+  <label>Password</label>
+  <input type="password" name="password" placeholder="••••••" required />
+
+  <button type="submit">Login</button>
+</form>
+{{ end }}
+
+{{ template "layout" . }}

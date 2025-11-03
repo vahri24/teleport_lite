@@ -2,7 +2,6 @@ package rbac
 
 import (
     "context"
-    "errors"
     "gorm.io/gorm"
     "strings"
 )

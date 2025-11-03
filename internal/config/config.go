@@ -17,6 +17,8 @@ func Load() Config {
     // Load .env file
     if err := godotenv.Load(); err != nil {
         log.Println("⚠️ .env file not found, using system environment variables")
+    } else {
+    log.Println("✅ .env file loaded successfully!")
     }
 
     cfg := Config{

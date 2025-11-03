@@ -1,19 +1,17 @@
-<!doctype html>
-<html>
+{{ define "layout" }}
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <title>{{block "title" .}}Teleport Lite{{end}}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <link href="/static/base.css" rel="stylesheet"/>
+  <meta charset="UTF-8" />
+  <title>{{ .title }}</title>
+  <link rel="stylesheet" href="/static/base.css" />
+  <script defer src="/static/app.js"></script>
 </head>
 <body>
-  <nav>
-    <a href="/">Dashboard</a>
-    <a href="/users">Users</a>
-    <a href="/roles">Roles</a>
-  </nav>
-  <main>
-    {{block "content" .}}{{end}}
+  <header><h1>Teleport Lite</h1></header>
+  <main class="container">
+    {{ template "content" . }}
   </main>
 </body>
 </html>
+{{ end }}
