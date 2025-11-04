@@ -50,6 +50,8 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 
 	// Public routes
 	r.POST("/api/v1/auth/login", handlers.LoginHandler(db, jwtSecret))
+	r.POST("/agents/register", handlers.RegisterAgent(db))
+	r.POST("/agents/heartbeat", handlers.AgentHeartbeat(db))
 	
 
 	// ✅ Protected API routes (still secure)
@@ -78,6 +80,9 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 
 		// Audit Trail
 		api.GET("/audit", require(chk, "audit:read"), listAudit(db))
+
+		// ✅ Agent Endpoints
+		
 	}
 
 	// ✅ Remove protected root route to prevent template conflicts

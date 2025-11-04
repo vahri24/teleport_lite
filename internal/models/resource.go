@@ -13,7 +13,7 @@ type Resource struct {
     Port            int            `gorm:"default:22" json:"Port"`  
     ExternalRef     string         `gorm:"size:255"`
     Host            string         `gorm:"size:100;not null" json:"Host"`
-    Metadata        datatypes.JSON `gorm:"type:json"`
+    Metadata        datatypes.JSON `gorm:"type:json" json:"metadata"`
     PublicKey       string         `gorm:"type:text" json:"-"`
     PrivateKey      string `gorm:"type:text" json:"-"`
     Status          string         `gorm:"size:50" json:"Status"`
