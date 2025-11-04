@@ -10,10 +10,13 @@ type Resource struct {
     OrgID       int64          `gorm:"index;not null"`
     Name        string         `gorm:"size:200;not null"`
     Type        string         `gorm:"size:100;not null"`
+    Port        int            `gorm:"default:22" json:"Port"`  
     ExternalRef string         `gorm:"size:255"`
     Host        string         `gorm:"size:100;not null" json:"Host"`
     Metadata    datatypes.JSON `gorm:"type:json"`
+    PublicKey   string         `gorm:"type:text" json:"Public_key"` 
     Status      string         `gorm:"size:50" json:"Status"`
+    LastHeartbeat time.Time      `json:"last_heartbeat"` 
     CreatedAt   time.Time
     UpdatedAt   time.Time
 
