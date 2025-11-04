@@ -116,7 +116,7 @@ async function loadLocalResources() {
   if (!grid) return;
 
   try {
-    const res = await fetch("/api/v1/resources/local", { credentials: "include" });
+    const res = await fetch("/api/v1/resources", { credentials: "include" });
     const data = await res.json();
 
     if (!data.resources || data.resources.length === 0) {
@@ -126,22 +126,31 @@ async function loadLocalResources() {
 
     grid.innerHTML = data.resources
       .map(
-        (r) => `
-        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition">
-          <div class="flex items-center justify-between mb-2">
-            <div>
-              <h3 class="text-slate-800 font-semibold">${r.name}</h3>
-              <p class="text-xs text-slate-500">${r.host}:${r.port}</p>
+        (r) => {
+        const osVersion = r.Metadata?.os || r.metadata?.os || "Unknown OS";
+        const statusColor =
+          r.Status === "online" ? "text-green-600" : "text-red-600";
+
+        return `
+          <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition">
+            <div class="flex items-center justify-between mb-2">
+              <div>
+                <h3 class="text-slate-800 font-semibold">${r.Name}</h3>
+                <p class="text-xs text-slate-500">${r.Host}</p>
+              </div>
+              <button class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg connect-btn"
+                      data-host="${r.Host}"
+                      data-user="${r.user || "fahrizal"}">
+                Connect
+              </button>
             </div>
-            <button class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg connect-btn"
-                    data-host="${r.host}"
-                    data-user="${r.user}">
-              Connect
-            </button>
+            <p class="text-xs text-slate-600">${osVersion}</p>
+            <p class="text-xs ${statusColor} font-medium mt-1">● ${
+          r.Status || "unknown"
+        }</p>
           </div>
-          <p class="text-xs text-slate-600">${r.user} • ${r.description}</p>
-        </div>
-      `
+        `;
+      }
       )
       .join("");
 

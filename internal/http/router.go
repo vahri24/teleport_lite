@@ -8,7 +8,7 @@ import (
 
 	"teleport_lite/internal/auth"
 	"teleport_lite/internal/http/handlers"
-	"teleport_lite/internal/models"
+	//"teleport_lite/internal/models"
 	"teleport_lite/internal/rbac"
 )
 
@@ -69,8 +69,8 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 		api.POST("/roles/:id/permissions", require(chk, "roles:write"), assignPerms(db))
 
 		// Resources
-		api.GET("/resources", require(chk, "resources:read"), listResources(db))
-		api.GET("/resources/local", require(chk, "resources:read"), handlers.GetLocalResource)
+		api.GET("/resources", require(chk, "resources:read"), handlers.ListResources(db))
+		//api.GET("/resources/local", require(chk, "resources:read"), handlers.GetLocalResource)
 		api.POST("/resources", require(chk, "resources:write"), createResource(db))
 
 		//SSH
@@ -93,19 +93,19 @@ func renderLogin() gin.HandlerFunc {
 }
 
 // Stub endpoints
-func listUsers(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var users []models.User
-		db.Find(&users)
-		c.JSON(http.StatusOK, gin.H{"users": users})
-	}
-}
+//func listUsers(db *gorm.DB) gin.HandlerFunc {
+//	return func(c *gin.Context) {
+//		var users []models.User
+//		db.Find(&users)
+//		c.JSON(http.StatusOK, gin.H{"users": users})
+//	}
+//}
 
-func createUser(db any) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.JSON(http.StatusCreated, gin.H{"message": "user created (stub)"})
-	}
-}
+//func createUser(db any) gin.HandlerFunc {
+//	return func(c *gin.Context) {
+//		c.JSON(http.StatusCreated, gin.H{"message": "user created (stub)"})
+//	}
+//}
 
 func assignRole(db any) gin.HandlerFunc {
 	return func(c *gin.Context) {
