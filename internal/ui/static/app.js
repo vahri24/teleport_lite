@@ -190,19 +190,20 @@ function openSSH(host, user) {
   term.open(termEl);
   fit.fit();
 
-  const password = prompt(`🔐 Password for ${user}@${host}`);
+  // ✅ No password prompt — key-based SSH via DB
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const url = `${proto}://${location.host}/api/v1/ws/ssh?host=${encodeURIComponent(
     host
   )}&port=22&user=${encodeURIComponent(user)}`;
-
+  
   const ws = new WebSocket(url);
   ws.binaryType = "arraybuffer";
-
+  
   ws.onopen = () => {
     const cols = term.cols || 120;
     const rows = term.rows || 32;
-    ws.send(JSON.stringify({ op: "auth", password, cols, rows }));
+    // ✅ send only terminal info
+    ws.send(JSON.stringify({ op: "auth", cols, rows }));
   };
 
   ws.onmessage = (ev) => {

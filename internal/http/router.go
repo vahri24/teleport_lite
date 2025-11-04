@@ -74,7 +74,7 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 		api.POST("/resources", require(chk, "resources:write"), createResource(db))
 
 		//SSH
-		api.GET("/ws/ssh", handlers.SSHWS)
+		api.GET("/ws/ssh", handlers.SSHWS(db))
 
 		// Audit Trail
 		api.GET("/audit", require(chk, "audit:read"), listAudit(db))

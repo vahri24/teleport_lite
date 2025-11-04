@@ -8,7 +8,6 @@ import (
 	"encoding/pem"
 	"io/ioutil"
 	"log"
-	//"net"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -54,7 +53,10 @@ func RunLocalAgent(gdb *gorm.DB) {
 	}
 
 	pubKeyBytes, _ := ioutil.ReadFile(publicKeyPath)
+	privKeyBytes, _ := ioutil.ReadFile(privateKeyPath)
+
 	pubKeyStr := strings.TrimSpace(string(pubKeyBytes))
+	privKeyStr := string(privKeyBytes)
 
 	// ✅ Ensure authorized_keys includes public key
 	appendKeyIfMissing(authKeysPath, pubKeyStr)
@@ -74,11 +76,13 @@ func RunLocalAgent(gdb *gorm.DB) {
 		Port:          22,
 		ExternalRef:   "Local Controller",
 		PublicKey:     pubKeyStr,
+		PrivateKey:    privKeyStr, // ✅ now also stored
 		Status:        "online",
 		LastHeartbeat: time.Now(),
 		Metadata:      datatypes.JSON(metaJSON),
 	}
 
+	// ✅ Save/update resource (exact same method as before)
 	if err := gdb.Where("host = ?", resource.Host).
 		Assign(resource).FirstOrCreate(&resource).Error; err != nil {
 		log.Printf("❌ Failed to register resource: %v", err)
