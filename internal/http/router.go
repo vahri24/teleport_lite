@@ -81,7 +81,7 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 		api.GET("/ws/ssh", handlers.SSHWS(db))
 
 		// Audit Trail
-		api.GET("/audit", require(chk, "audit:read"), listAudit(db))
+		api.GET("/audit", require(chk, "audit:read"), handlers.ListAudit(db))
 
 		// ✅ Agent Endpoints
 		
@@ -138,11 +138,6 @@ func createResource(db any) gin.HandlerFunc {
 	}
 }
 
-func listAudit(db any) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"audit": []string{}})
-	}
-}
 
 func require(chk rbac.Checker, permKey string) gin.HandlerFunc {
 	return func(c *gin.Context) {

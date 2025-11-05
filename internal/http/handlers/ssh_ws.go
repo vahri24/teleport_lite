@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,7 +12,9 @@ import (
 	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/ssh"
 	"gorm.io/gorm"
+	"gorm.io/datatypes"
 	"teleport_lite/internal/models"
+	"teleport_lite/internal/auth"
 )
 
 var upgrader = websocket.Upgrader{
@@ -39,6 +43,37 @@ func SSHWS(gdb *gorm.DB) gin.HandlerFunc {
 			return
 		}
 		defer conn.Close()
+
+		// ✅ Extract user info from JWT
+		var userID, orgID int64
+		if claimsVal, ok := c.Get("claims"); ok {
+			if cl, ok := claimsVal.(*auth.Claims); ok {
+				userID = int64(cl.UserID)
+				orgID = int64(cl.OrgID)
+			}
+		}
+
+		// ✅ Detect client IP
+		clientIP, _, _ := net.SplitHostPort(c.Request.RemoteAddr)
+
+		// ✅ Prepare metadata JSON
+		meta := map[string]string{
+			"ssh_user": user,
+			"host":     host,
+		}
+		metaJSON, _ := json.Marshal(meta)
+
+		// ✅ Record SSH connect
+		connectLog := models.AuditLog{
+			OrgID:        orgID,
+			UserID:       userID,
+			Action:       "ssh_connect",
+			ResourceType: "SSH",
+			IP:           clientIP,
+			Metadata:     datatypes.JSON(metaJSON),
+			CreatedAt:    time.Now(),
+		}
+		_ = gdb.Create(&connectLog).Error
 
 		// Wait for initial auth message from client
 		var auth wsAuthMsg
@@ -135,6 +170,18 @@ func SSHWS(gdb *gorm.DB) gin.HandlerFunc {
 				_, _ = stdin.Write(data)
 			}
 		}
+
+		// ✅ Record SSH disconnect when session ends
+		disconnectLog := models.AuditLog{
+			OrgID:        orgID,
+			UserID:       userID,
+			Action:       "ssh_disconnect",
+			ResourceType: "SSH",
+			IP:           clientIP,
+			Metadata:     datatypes.JSON(metaJSON),
+			CreatedAt:    time.Now(),
+		}
+		_ = gdb.Create(&disconnectLog).Error
 
 		_ = session.Close()
 	}
