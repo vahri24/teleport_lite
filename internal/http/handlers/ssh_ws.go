@@ -192,7 +192,7 @@ func SSHWS(gdb *gorm.DB) gin.HandlerFunc {
 		disconnectLog := models.AuditLog{
 			OrgID:        	orgID,
 			UserID:       	userID,
-			Action:       	"ssh_connect",
+			Action:       	"ssh_disconnect",
 			ResourceType: 	"SSH",
 			IP:           	clientIP,
 			UserAgent:     	userAgent,

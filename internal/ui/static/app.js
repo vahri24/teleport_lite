@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const onDashboard = path === "/dashboard";
   const onResources = path === "/resources";
   const onUsers = path === "/users";
+  const onAudit = path === "/audit";
 
   // Protect dashboard and resources routes
   if (onDashboard || onResources) checkAuth();
@@ -37,6 +38,13 @@ document.addEventListener("DOMContentLoaded", () => {
     loadLocalResources();
     setupAddResourceModal();
   }
+
+  // Audit page handlers
+  if (onAudit) {
+    console.log("📜 Loading Audit");
+    loadAuditLogs();
+  }
+
 });
 
 // --------------------------- LOGIN HANDLER --------------------------- //
@@ -134,7 +142,6 @@ async function loadUsers() {
     }
 
     data.users.forEach((u, i) => {
-      const roleName = u.Roles && u.Roles.length > 0 ? u.Roles[0].Name : "-";
       const row = `
         <tr class="border-b hover:bg-slate-50 transition">
           <td class="py-3 px-4">${i + 1}</td>
@@ -351,6 +358,51 @@ function setupAddResourceModal() {
     });
   }
 }
+
+// ===== AUDIT TRAIL PAGE =====
+async function loadAuditLogs() {
+  const table = document.getElementById("auditTable");
+  if (!table) return;
+
+  try {
+    const res = await fetch("/api/v1/audit", { credentials: "include" });
+    const data = await res.json();
+
+    table.innerHTML = "";
+
+    const logs = data.logs || data.Audit || [];
+
+    if (logs.length === 0) {
+      table.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-slate-400">No audit logs found.</td></tr>`;
+      return;
+    }
+    
+    logs.forEach((log, i) => {
+      const row = `
+        <tr class="border-b hover:bg-slate-50 transition">
+          <td class="py-3 px-4">${i + 1}</td>
+          <td class="py-3 px-4 text-slate-700">${log.initiator_name || log.User || "-"}</td>
+          <td class="py-3 px-4 text-slate-700">${log.Action || "-"}</td>
+          <td class="py-3 px-4 text-slate-700">${log.ResourceType || "-"}</td>
+          <td class="py-3 px-4 text-slate-700">${log.IP || "-"}</td>
+          <td class="py-3 px-4 text-slate-500">${new Date(log.CreatedAt).toLocaleString()}</td>
+        </tr>`;
+      table.insertAdjacentHTML("beforeend", row);
+    });
+  } catch (err) {
+    console.error("Failed to load audit logs:", err);
+    table.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-red-500">Failed to load audit logs.</td></tr>`;
+  }
+}
+
+// Hook refresh button
+document.addEventListener("DOMContentLoaded", () => {
+  if (document.getElementById("refreshAudit")) {
+    loadAuditLogs();
+    document.getElementById("refreshAudit").addEventListener("click", loadAuditLogs);
+  }
+});
+
 
 // --------------------------- LOGOUT HANDLER --------------------------- //
 function setupLogout() {

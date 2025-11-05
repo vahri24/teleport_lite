@@ -1,0 +1,53 @@
+{{ define "audit_content" }}
+
+<!-- Header -->
+<div class="bg-white rounded-2xl shadow p-6 md:p-8 mb-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-2xl font-semibold mb-1">Audit Trail</h2>
+      <p class="text-slate-600 text-sm">View all recorded user actions and SSH connection logs.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="refreshAudit" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+        <span>↻</span> Refresh
+      </button>
+      <a href="/dashboard" class="text-sm text-slate-500 hover:text-slate-700 underline">← Back to Dashboard</a>
+    </div>
+  </div>
+</div>
+
+<!-- Search -->
+<div class="bg-white rounded-2xl shadow p-6 mb-6">
+  <input
+    id="searchAudit"
+    type="text"
+    placeholder="Search by user, action, or resource..."
+    class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+  />
+</div>
+
+<!-- Table -->
+<div class="bg-white rounded-2xl shadow p-6">
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm text-left">
+      <thead>
+        <tr class="border-b text-slate-500">
+          <th class="py-3 px-4">No</th>
+          <th class="py-3 px-4">User</th>
+          <th class="py-3 px-4">Action</th>
+          <th class="py-3 px-4">Resource</th>
+          <th class="py-3 px-4">IP</th>
+          <th class="py-3 px-4">Timestamp</th>
+        </tr>
+      </thead>
+      <tbody id="auditTable">
+        <tr>
+          <td colspan="6" class="py-4 text-center text-slate-400">Loading audit logs...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{{ end }}
+{{ template "layout" . }}
