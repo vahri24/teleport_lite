@@ -190,13 +190,15 @@ func SSHWS(gdb *gorm.DB) gin.HandlerFunc {
 
 		// ✅ Record SSH disconnect when session ends
 		disconnectLog := models.AuditLog{
-			OrgID:        orgID,
-			UserID:       userID,
-			Action:       "ssh_disconnect",
-			ResourceType: "SSH",
-			IP:           clientIP,
-			Metadata:     datatypes.JSON(metaJSON),
-			CreatedAt:    time.Now(),
+			OrgID:        	orgID,
+			UserID:       	userID,
+			Action:       	"ssh_connect",
+			ResourceType: 	"SSH",
+			IP:           	clientIP,
+			UserAgent:     	userAgent,
+			InitiatorName: 	webUserName,
+			Metadata:     	datatypes.JSON(metaJSON),
+			CreatedAt:    	time.Now(),
 		}
 		_ = gdb.Create(&disconnectLog).Error
 

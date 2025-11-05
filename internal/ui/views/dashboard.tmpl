@@ -10,12 +10,13 @@
 <!-- Quick Nav -->
 <div class="bg-white rounded-2xl shadow p-6 mb-8">
   <h3 class="text-lg font-semibold mb-4">Quick Navigation</h3>
-  <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-    <li><a class="block rounded-xl border border-slate-200 px-4 py-3 hover:border-blue-400 hover:bg-blue-50 transition" href="/users">👤 Users</a></li>
-    <li><a class="block rounded-xl border border-slate-200 px-4 py-3 hover:border-blue-400 hover:bg-blue-50 transition" href="/api/v1/roles" target="_blank">🧩 Roles</a></li>
-    <li><a class="block rounded-xl border border-slate-200 px-4 py-3 hover:border-blue-400 hover:bg-blue-50 transition" href="/resources">📦 Resources</a></li>
-    <li><a class="block rounded-xl border border-slate-200 px-4 py-3 hover:border-blue-400 hover:bg-blue-50 transition" href="/api/v1/audit" target="_blank">📜 Audit Trail</a></li>
-  </ul>
+  <div class="flex justify-center gap-4 flex-wrap">
+    <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+      <li><a class="block rounded-xl border border-slate-200 px-4 py-3 hover:border-blue-400 hover:bg-blue-50 transition" href="/users">👤 Users</a></li>
+      <li><a class="block rounded-xl border border-slate-200 px-4 py-3 hover:border-blue-400 hover:bg-blue-50 transition" href="/resources">📦 Resources</a></li>
+      <li><a class="block rounded-xl border border-slate-200 px-4 py-3 hover:border-blue-400 hover:bg-blue-50 transition" href="/api/v1/audit" target="_blank">📜 Audit Trail</a></li>
+    </ul>
+  </div>
 </div>
 
 <!-- Live Data (with refresh buttons) -->
