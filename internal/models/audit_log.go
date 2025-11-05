@@ -14,6 +14,7 @@ type AuditLog struct {
     ResourceID    int64          `gorm:"index"`             // optional link to resource
     Metadata      datatypes.JSON `gorm:"type:json"`         // details of what changed
     IP            string         `gorm:"size:64"`
+    InitiatorName string         `gorm:"size:255" json:"initiator_name"`
     UserAgent     string         `gorm:"size:255"`
     CreatedAt     time.Time
 

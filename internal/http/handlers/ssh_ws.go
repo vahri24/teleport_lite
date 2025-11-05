@@ -44,14 +44,27 @@ func SSHWS(gdb *gorm.DB) gin.HandlerFunc {
 		}
 		defer conn.Close()
 
+		// ✅ Extract user agent from request
+		userAgent := c.Request.Header.Get("User-Agent")
+
+
 		// ✅ Extract user info from JWT
 		var userID, orgID int64
+		var webUserName, webUserEmail string
 		if claimsVal, ok := c.Get("claims"); ok {
 			if cl, ok := claimsVal.(*auth.Claims); ok {
 				userID = int64(cl.UserID)
 				orgID = int64(cl.OrgID)
 			}
 		}
+
+		var dbUser models.User
+		if err := gdb.First(&dbUser, userID).Error; err == nil {
+		    webUserName = dbUser.Name
+		    webUserEmail = dbUser.Email
+		} else {
+		    webUserName = "Unknown"
+}
 
 		// ✅ Detect client IP
 		clientIP, _, _ := net.SplitHostPort(c.Request.RemoteAddr)
@@ -60,18 +73,22 @@ func SSHWS(gdb *gorm.DB) gin.HandlerFunc {
 		meta := map[string]string{
 			"ssh_user": user,
 			"host":     host,
+			"initiator":  webUserName,
+    		"initiator_email": webUserEmail,
 		}
 		metaJSON, _ := json.Marshal(meta)
 
 		// ✅ Record SSH connect
 		connectLog := models.AuditLog{
-			OrgID:        orgID,
-			UserID:       userID,
-			Action:       "ssh_connect",
-			ResourceType: "SSH",
-			IP:           clientIP,
-			Metadata:     datatypes.JSON(metaJSON),
-			CreatedAt:    time.Now(),
+			OrgID:        	orgID,
+			UserID:       	userID,
+			Action:       	"ssh_connect",
+			ResourceType: 	"SSH",
+			IP:           	clientIP,
+			UserAgent:     	userAgent,
+			InitiatorName: 	webUserName,
+			Metadata:     	datatypes.JSON(metaJSON),
+			CreatedAt:    	time.Now(),
 		}
 		_ = gdb.Create(&connectLog).Error
 
