@@ -64,6 +64,8 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 		api.GET("/users", require(chk, "users:read"), handlers.ListUsers(db))
 		api.POST("/users", require(chk, "users:write"), handlers.CreateUser(db))
 		api.POST("/users/:id/roles", require(chk, "users:assign-role"), assignRole(db))
+		api.GET("/users/connect-list", require(chk, "users:read"), handlers.ListConnectUsers(db))
+
 
 		// Roles
 		api.GET("/roles", require(chk, "roles:read"), handlers.ListRoles(db))

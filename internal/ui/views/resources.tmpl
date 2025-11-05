@@ -111,6 +111,24 @@
     </div>
   </div>
 </div>
+<div id="userModal"
+           class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-xl w-96 p-6">
+          <h3 class="text-lg font-semibold mb-4">Select SSH User</h3>
+          <select id="userSelect"
+                  class="border border-slate-300 rounded-lg w-full p-2 mb-4"></select>
+          <div class="flex justify-end gap-2">
+            <button id="cancelUserSelect"
+                    class="px-3 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">
+              Cancel
+            </button>
+            <button id="confirmUserSelect"
+                    class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              Connect
+            </button>
+          </div>
+        </div>
+</div>
 {{ end }}
 
 {{ template "layout" . }}

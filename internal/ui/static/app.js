@@ -125,8 +125,7 @@ async function loadLocalResources() {
     }
 
     grid.innerHTML = data.resources
-      .map(
-        (r) => {
+      .map((r) => {
         const osVersion = r.Metadata?.os || r.metadata?.os || "Unknown OS";
         const statusColor =
           r.Status === "online" ? "text-green-600" : "text-red-600";
@@ -139,27 +138,21 @@ async function loadLocalResources() {
                 <p class="text-xs text-slate-500">${r.Host}</p>
               </div>
               <button class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg connect-btn"
-                      data-host="${r.Host}"
-                      data-user="${r.user || "fahrizal"}">
+                      data-host="${r.Host}">
                 Connect
               </button>
             </div>
             <p class="text-xs text-slate-600">${osVersion}</p>
-            <p class="text-xs ${statusColor} font-medium mt-1">● ${
-          r.Status || "unknown"
-        }</p>
           </div>
         `;
-      }
-      )
+      })
       .join("");
 
     // Attach connect handlers
     document.querySelectorAll(".connect-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
+      btn.addEventListener("click", async (e) => {
         const host = e.currentTarget.dataset.host;
-        const user = e.currentTarget.dataset.user;
-        openSSH(host, user);
+        await showUserSelectModal(host);
       });
     });
   } catch (err) {
@@ -168,7 +161,50 @@ async function loadLocalResources() {
   }
 }
 
-// --------------------------- SSH CONNECT MODAL --------------------------- //
+// --------------------------- SELECT SSH USER MODAL --------------------------- //
+async function showUserSelectModal(host) {
+  const modal = document.getElementById("userModal");
+  const select = document.getElementById("userSelect");
+  const confirmBtn = document.getElementById("confirmUserSelect");
+  const cancelBtn = document.getElementById("cancelUserSelect");
+
+  modal.classList.remove("hidden");
+  select.innerHTML = "<option>Loading allowed SSH users...</option>";
+
+  try {
+    const res = await fetch("/api/v1/users/connect-list", {
+      credentials: "include",
+    });
+    const data = await res.json();
+
+    select.innerHTML = "";
+    if (data.connect_user && data.connect_user.length > 0) {
+      data.connect_user.forEach((u) => {
+        const opt = document.createElement("option");
+        opt.value = u;
+        opt.textContent = u;
+        select.appendChild(opt);
+      });
+    } else {
+      const opt = document.createElement("option");
+      opt.textContent = "No SSH users available";
+      select.appendChild(opt);
+    }
+  } catch (err) {
+    console.error("Failed to load SSH users:", err);
+    select.innerHTML = "<option>Error loading users</option>";
+  }
+
+  cancelBtn.onclick = () => modal.classList.add("hidden");
+
+  confirmBtn.onclick = () => {
+    const selectedUser = select.value;
+    modal.classList.add("hidden");
+    openSSH(host, selectedUser);
+  };
+}
+
+// --------------------------- SSH CONNECT --------------------------- //
 function openSSH(host, user) {
   const modal = document.getElementById("sshModal");
   const closeBtn = document.getElementById("closeSSH");
@@ -190,28 +226,23 @@ function openSSH(host, user) {
   term.open(termEl);
   fit.fit();
 
-  // ✅ No password prompt — key-based SSH via DB
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const url = `${proto}://${location.host}/api/v1/ws/ssh?host=${encodeURIComponent(
     host
   )}&port=22&user=${encodeURIComponent(user)}`;
-  
+
   const ws = new WebSocket(url);
   ws.binaryType = "arraybuffer";
-  
+
   ws.onopen = () => {
     const cols = term.cols || 120;
     const rows = term.rows || 32;
-    // ✅ send only terminal info
     ws.send(JSON.stringify({ op: "auth", cols, rows }));
   };
 
   ws.onmessage = (ev) => {
-    if (ev.data instanceof ArrayBuffer) {
-      term.write(new Uint8Array(ev.data));
-    } else {
-      term.write(String(ev.data));
-    }
+    if (ev.data instanceof ArrayBuffer) term.write(new Uint8Array(ev.data));
+    else term.write(String(ev.data));
   };
 
   ws.onclose = () => term.write("\r\n\x1b[33m[Disconnected]\x1b[0m\r\n");
@@ -224,7 +255,9 @@ function openSSH(host, user) {
 
   window.addEventListener("resize", () => fit.fit());
   closeBtn.onclick = () => {
-    try { ws.close(); } catch {}
+    try {
+      ws.close();
+    } catch {}
     modal.classList.add("hidden");
   };
 }
