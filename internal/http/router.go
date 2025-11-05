@@ -40,6 +40,12 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
     	})
 	})
 
+	r.GET("/users", func(c *gin.Context) {
+    c.HTML(http.StatusOK, "users.tmpl", gin.H{
+        "title": "Users",
+    	})
+	})
+
 	// ✅ Resource (PUBLIC PAGE for now so redirect works)
 	r.GET("/resources", func(c *gin.Context) {
 	c.HTML(http.StatusOK, "resources.tmpl", gin.H{

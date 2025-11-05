@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const path = window.location.pathname;
   const onDashboard = path === "/dashboard";
   const onResources = path === "/resources";
+  const onUsers = path === "/users";
 
   // Protect dashboard and resources routes
   if (onDashboard || onResources) checkAuth();
@@ -21,7 +22,13 @@ document.addEventListener("DOMContentLoaded", () => {
   if (onDashboard) {
     loadTable("/api/v1/roles", "rolesTable", 3);
     loadTable("/api/v1/resources", "resourcesTable", 4);
-    loadTable("/api/v1/audit", "auditTable", 5);
+    loadResourcesChart();
+  }
+
+  // Users loaders
+  if (onUsers) {
+    console.log("👤 Loading real Users...");
+    loadUsers();
   }
 
   // Resources page handlers
@@ -109,6 +116,49 @@ async function loadTable(apiPath, tableId, columns) {
     console.error(`Error loading ${apiPath}:`, err);
   }
 }
+
+// ===== USERS PAGE =====
+async function loadUsers() {
+  const table = document.getElementById("usersTable");
+  if (!table) return;
+
+  try {
+    const res = await fetch("/api/v1/users", { credentials: "include" });
+    const data = await res.json();
+
+    table.innerHTML = "";
+
+    if (!data.users || data.users.length === 0) {
+      table.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-400">No users found.</td></tr>`;
+      return;
+    }
+
+    data.users.forEach((u, i) => {
+      const roleName = u.Roles && u.Roles.length > 0 ? u.Roles[0].Name : "-";
+      const row = `
+        <tr class="border-b hover:bg-slate-50 transition">
+          <td class="py-3 px-4">${i + 1}</td>
+          <td class="py-3 px-4 font-medium text-slate-700">${u.Name}</td>
+          <td class="py-3 px-4 text-slate-600">${u.Email}</td>
+          <td class="py-3 px-4">${u.role || "-"}</td>
+          <td class="py-3 px-4">${u.status || "active"}</td>
+        </tr>`;
+      table.insertAdjacentHTML("beforeend", row);
+    });
+  } catch (err) {
+    console.error("Failed to load users:", err);
+    table.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-red-500">Failed to load users.</td></tr>`;
+  }
+}
+
+// Hook refresh button
+document.addEventListener("DOMContentLoaded", () => {
+  if (document.getElementById("refreshUsers")) {
+    loadUsers();
+    document.getElementById("refreshUsers").addEventListener("click", loadUsers);
+  }
+});
+
 
 // --------------------------- RESOURCES: LOAD LOCAL INSTANCE --------------------------- //
 async function loadLocalResources() {
@@ -327,3 +377,60 @@ function setupUserMenu() {
     window.addEventListener("click", () => dropdown.classList.add("hidden"));
   }
 }
+
+// --------------------------- DASHBOARD RESOURCE CHART --------------------------- //
+async function loadResourcesChart() {
+  const canvas = document.getElementById("resourcesChart");
+  if (!canvas) return;
+
+  try {
+    const res = await fetch("/api/v1/resources", {
+      credentials: "include", // ✅ sends cookie with request
+    });
+
+    if (res.status === 401) {
+      console.warn("⚠️ Unauthorized — redirecting to login");
+      window.location.href = "/login";
+      return;
+    }
+
+    const data = await res.json();
+    const count = data.resources ? data.resources.length : 0;
+
+    const ctx = canvas.getContext("2d");
+    new Chart(ctx, {
+      type: "doughnut",
+      data: {
+        labels: ["Resources"],
+        datasets: [{
+          data: [1],
+          backgroundColor: ["#14b8a6", "#e5e7eb"], // teal + light gray
+          cutout: "75%",
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: false },
+        },
+      },
+      plugins: [{
+        id: "textCenter",
+        beforeDraw(chart) {
+          const { ctx, width } = chart;
+          ctx.save();
+          ctx.font = "bold 64px sans-serif";
+          ctx.fillStyle = "#0f766e";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(count.toString(), width / 2, chart.chartArea.top + 80);
+          ctx.restore();
+        },
+      }],
+    });
+  } catch (err) {
+    console.error("Failed to load resources chart:", err);
+  }
+}
+
