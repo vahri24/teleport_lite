@@ -14,7 +14,7 @@ type User struct {
     Email           string     `gorm:"uniqueIndex;size:255;not null"`
     Name            string     `gorm:"size:200"`
     AuthProvider    string     `gorm:"size:20;default:local"`
-    PasswordHash    string     `gorm:"size:255"`
+    PasswordHash    string     `gorm:"column:password_hash" json:"-"`
     ConnectUser     string    `gorm:"size:255" json:"connect_user"`
     Status          UserStatus `gorm:"size:16;default:active"`
     CreatedAt       time.Time

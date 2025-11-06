@@ -30,6 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (onUsers) {
     console.log("👤 Loading real Users...");
     loadUsers();
+    setupAddUserModal();
   }
 
   // Resources page handlers
@@ -165,6 +166,46 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("refreshUsers").addEventListener("click", loadUsers);
   }
 });
+
+// --------------------------- ADD User MODAL --------------------------- //
+function setupAddUserModal() {
+  const modal = document.getElementById("addUserModal");
+  const showBtn = document.getElementById("showAddUser");
+  const cancelBtn = document.getElementById("cancelAddUser");
+  const form = document.getElementById("addUserForm");
+
+  if (showBtn && modal) showBtn.addEventListener("click", () => modal.classList.remove("hidden"));
+  if (cancelBtn && modal) cancelBtn.addEventListener("click", () => modal.classList.add("hidden"));
+
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      const payload = Object.fromEntries(formData.entries());
+
+      try {
+        const res = await fetch("/api/v1/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          console.log("✅ User added:", data);
+          form.reset();
+          modal.classList.add("hidden");
+          loadLocalUsers();
+        } else {
+          alert("❌ Failed: " + data.error);
+        }
+      } catch (err) {
+        console.error("Error adding User:", err);
+      }
+    });
+  }
+}
 
 
 // --------------------------- RESOURCES: LOAD LOCAL INSTANCE --------------------------- //
