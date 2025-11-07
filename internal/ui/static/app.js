@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const onAudit = path === "/audit";
 
   // Protect dashboard and resources routes
-  if (onDashboard || onResources) checkAuth();
+  if (onDashboard || onResources || onAudit || onUsers) checkAuth();
 
   // Login handler
   const loginForm = document.getElementById("loginForm");
