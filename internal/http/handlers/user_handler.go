@@ -26,7 +26,7 @@ func ListUsers(db *gorm.DB) gin.HandlerFunc {
 func CreateUser(db *gorm.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
         type inputDTO struct {
-			OrgID    int64  `json:"org_id" binding:"required"`
+			OrgID    int64  `json:"org_id,string" binding:"required"`
 			Email    string `json:"email" binding:"required,email"`
 			Name     string `json:"name" binding:"required"`
 			Password string `json:"password" binding:"required"`

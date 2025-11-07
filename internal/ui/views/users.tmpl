@@ -29,6 +29,18 @@
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
       <h2 class="text-lg font-semibold text-slate-800 mb-4">Add New User</h2>
       <form id="addUserForm" class="space-y-4">
+      
+        <div>
+          <label class="block text-sm mb-1 text-slate-700">Organization</label>
+          <select name="org_id" id="org_id"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+            <option value="1">Organic</option>
+            <option value="3">Non-Organic</option>
+            <option value="4">Vendor</option>
+          </select>
+          <p class="text-xs text-slate-500 mt-1">Choose the organization type for this user.</p>
+        </div>
+
         <div>
           <label class="block text-sm mb-1 text-slate-700">Name</label>
           <input type="text" name="name"
@@ -38,7 +50,7 @@
 
         <div>
           <label class="block text-sm mb-1 text-slate-700">Email</label>
-          <input type="email" name="Email"
+          <input type="email" name="email"
             class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             placeholder="***@example.com" required />
         </div>
@@ -49,6 +61,8 @@
             class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             placeholder="***" required />
         </div>
+
+        <input type="hidden" name="status" value="active" />
 
         <div class="flex justify-end gap-3 pt-2">
           <button type="button" id="cancelAddUser"
