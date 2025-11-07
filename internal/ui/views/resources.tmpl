@@ -6,20 +6,16 @@
     <div class="flex items-center justify-between mb-6">
       <div class="flex items-center gap-3">
         <h1 class="text-2xl font-semibold text-slate-800">Resources</h1>
-        <a href="/dashboard"
-          class="px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition shadow-sm">
-          ← Back to Dashboard
-        </a>
     </div>
       <div class="flex gap-2">
-        <button id="refreshResources"
-          class="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow transition">
-          ↻ Refresh
-        </button>
         <button id="showAddResource"
           class="px-3 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg shadow transition">
           ➕ Add Resource
         </button>
+        <a href="/dashboard"
+          class="px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition shadow-sm">
+          ← Back to Dashboard
+        </a>
       </div>
     </div>
 
@@ -42,57 +38,66 @@
   <div id="addResourceModal"
     class="hidden fixed inset-0 bg-black/30 flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-      <h2 class="text-lg font-semibold text-slate-800 mb-4">Add New Resource</h2>
-      <form id="addResourceForm" class="space-y-4">
-        <div>
-          <label class="block text-sm mb-1 text-slate-700">Name</label>
-          <input type="text" name="name"
-            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            placeholder="Server name" required />
-        </div>
+        <h2 class="text-2xl font-bold text-gray-900 mb-2">Add New Resource</h2>
+        <p class="text-gray-600 mb-4">
+          Follow the steps below to install and register your agent.
+        </p>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-sm mb-1 text-slate-700">Host/IP</label>
-            <input type="text" name="host"
-              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="192.168.1.10" required />
-          </div>
-          <div>
-            <label class="block text-sm mb-1 text-slate-700">Port</label>
-            <input type="number" name="port"
-              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="22" value="22" required />
+        <!-- Step 1: Download -->
+        <div class="mb-6">
+          <p class="text-sm text-gray-700 font-medium mb-2">1️⃣ Download the Teleport Agent:</p>
+          <div class="flex items-center justify-between bg-gray-100 border rounded-xl px-4 py-3">
+            <p class="text-sm text-gray-800 truncate">teleport-agent.tar.gz</p>
+            <button
+              id="downloadAgent"
+              class="ml-3 bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded transition"
+            >
+              Download
+            </button>
           </div>
         </div>
 
-        <div>
-          <label class="block text-sm mb-1 text-slate-700">User</label>
-          <input type="text" name="user"
-            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            placeholder="ubuntu" required />
+        <!-- Step 2: Extract -->
+        <div class="mb-4">
+          <p class="text-sm text-gray-700 font-medium mb-2">2️⃣ Extract the archive:</p>
+          <div class="relative bg-gray-900 text-gray-100 rounded-xl px-4 py-3 flex items-center justify-between">
+            <code id="cmdExtract" class="text-sm font-mono truncate">tar -xzf teleport-agent.tar.gz</code>
+            <button
+              id="copyExtract"
+              class="ml-3 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded transition"
+            >
+              Copy
+            </button>
+          </div>
         </div>
 
-        <div>
-          <label class="block text-sm mb-1 text-slate-700">Description</label>
-          <textarea name="description"
-            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            placeholder="Development or production server..."></textarea>
+        <!-- Step 3: Run Agent -->
+        <div class="mb-2">
+          <p class="text-sm text-gray-700 font-medium mb-2">3️⃣ Run the agent after extracting:</p>
+          <div class="relative bg-gray-900 text-gray-100 rounded-xl px-4 py-3 flex items-center justify-between">
+            <code id="cmdRun" class="text-sm font-mono break-all"></code>
+            <button
+              id="copyRun"
+              class="ml-3 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded transition"
+            >
+              Copy
+            </button>
+          </div>
         </div>
+
+        <p class="text-xs text-gray-500 mt-4 italic">
+          💡 Ensure this machine can reach your controller before running the agent.
+        </p>
 
         <div class="flex justify-end gap-3 pt-2">
           <button type="button" id="cancelAddResource"
             class="px-3 py-2 rounded-lg bg-slate-200 text-slate-700 text-sm hover:bg-slate-300">
-            Cancel
-          </button>
-          <button type="submit"
-            class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">
-            Save
+            Close
           </button>
         </div>
-      </form>
     </div>
   </div>
+  
 </section>
 
 <!-- SSH Terminal Modal -->

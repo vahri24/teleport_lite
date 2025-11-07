@@ -29,7 +29,7 @@
       </a>
 
       <!-- Right: User Menu -->
-      {{ if or (eq .title "Dashboard") (eq .title "Resources") }}
+      {{ if or (eq .title "Dashboard") (eq .title "Resources") (eq .title "Audit") (eq .title "Users") }}
       <div class="relative" id="userMenu">
         <button id="userMenuBtn"
                 class="flex items-center space-x-2 bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded-lg text-sm transition">

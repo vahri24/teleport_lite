@@ -365,39 +365,10 @@ function setupAddResourceModal() {
   const modal = document.getElementById("addResourceModal");
   const showBtn = document.getElementById("showAddResource");
   const cancelBtn = document.getElementById("cancelAddResource");
-  const form = document.getElementById("addResourceForm");
 
   if (showBtn && modal) showBtn.addEventListener("click", () => modal.classList.remove("hidden"));
   if (cancelBtn && modal) cancelBtn.addEventListener("click", () => modal.classList.add("hidden"));
 
-  if (form) {
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const formData = new FormData(form);
-      const payload = Object.fromEntries(formData.entries());
-
-      try {
-        const res = await fetch("/api/v1/resources", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(payload),
-        });
-
-        const data = await res.json();
-        if (res.ok) {
-          console.log("✅ Resource added:", data);
-          form.reset();
-          modal.classList.add("hidden");
-          loadLocalResources();
-        } else {
-          alert("❌ Failed: " + data.error);
-        }
-      } catch (err) {
-        console.error("Error adding resource:", err);
-      }
-    });
-  }
 }
 
 // ===== AUDIT TRAIL PAGE =====
@@ -526,4 +497,75 @@ async function loadResourcesChart() {
     console.error("Failed to load resources chart:", err);
   }
 }
+
+//Snippet
+document.addEventListener("DOMContentLoaded", () => {
+  // Detect controller URL automatically
+  const controllerURL = window.location.origin;
+  const cmdRun = document.getElementById("cmdRun");
+
+  if (cmdRun) {
+    cmdRun.innerText = `CONTROLLER_URL=${controllerURL} ./teleport-agent`;
+  }
+
+  // Handle file download
+  const downloadBtn = document.getElementById("downloadAgent");
+  if (downloadBtn) {
+    downloadBtn.addEventListener("click", async () => {
+      try {
+        const response = await fetch("/internal/shared/teleport-agent.tar.gz");
+        if (!response.ok) throw new Error("File not found or inaccessible.");
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "teleport-agent.tar.gz";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+        downloadBtn.textContent = "Downloaded!";
+        downloadBtn.classList.replace("bg-green-600", "bg-green-700");
+        setTimeout(() => (downloadBtn.textContent = "Download"), 2000);
+      } catch (err) {
+        console.error("Download failed:", err);
+        downloadBtn.textContent = "Error";
+        downloadBtn.classList.replace("bg-green-600", "bg-red-600");
+      }
+    });
+  }
+
+  // Copy buttons functionality
+  const copyButtons = [
+    { btn: "copyExtract", code: "cmdExtract" },
+    { btn: "copyRun", code: "cmdRun" },
+  ];
+
+  copyButtons.forEach(({ btn, code }) => {
+    const button = document.getElementById(btn);
+    const codeEl = document.getElementById(code);
+
+    if (button && codeEl) {
+      button.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(codeEl.innerText.trim());
+          button.textContent = "Copied!";
+          button.classList.remove("bg-blue-600");
+          button.classList.add("bg-green-600");
+          setTimeout(() => {
+            button.textContent = "Copy";
+            button.classList.remove("bg-green-600");
+            button.classList.add("bg-blue-600");
+          }, 2000);
+        } catch (err) {
+          console.error("Copy failed:", err);
+          button.textContent = "Error";
+        }
+      });
+    }
+  });
+});
+
 

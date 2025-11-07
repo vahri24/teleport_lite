@@ -16,7 +16,13 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 	r := gin.Default()
 	r.LoadHTMLGlob("internal/ui/views/*.tmpl")
 	r.Static("/static", "internal/ui/static")
-
+	
+	// ✅ Secure static route for agent download
+	shared := r.Group("/internal/shared")
+	shared.Use(auth.JWT(jwtSecret))
+	{
+	    shared.Static("/", "./internal/shared")
+	}
 	// favicon fix
 	r.GET("/favicon.ico", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
@@ -95,8 +101,6 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 
 		// Audit Trail
 		api.GET("/audit", require(chk, "audit:read"), handlers.ListAudit(db))
-
-		// ✅ Agent Endpoints
 		
 	}
 
