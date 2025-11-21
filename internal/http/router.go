@@ -66,6 +66,12 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
     	})
 	})
 
+	r.GET("/roles", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "roles.tmpl", gin.H{
+			"title": "Roles",
+			})
+		})
+
 
 	// Public routes
 	r.POST("/api/v1/auth/login", handlers.LoginHandler(db, jwtSecret))

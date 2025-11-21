@@ -29,7 +29,7 @@
       </a>
 
       <!-- Right: User Menu -->
-      {{ if or (eq .title "Dashboard") (eq .title "Resources") (eq .title "Audit") (eq .title "Users") }}
+      {{ if or (eq .title "Dashboard") (eq .title "Resources") (eq .title "Audit") (eq .title "Users") (eq .title "Roles")}}
       <div class="relative" id="userMenu">
         <button id="userMenuBtn"
                 class="flex items-center space-x-2 bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded-lg text-sm transition">
@@ -64,6 +64,8 @@
       {{ template "users_content" . }}
     {{ else if eq .title "Audit" }}
       {{ template "audit_content" . }}
+    {{ else if eq .title "Roles" }}
+      {{ template "roles_content" . }}
     {{ else }}
       <div class="p-6 bg-white rounded-2xl shadow">
         <p class="text-sm text-slate-500">

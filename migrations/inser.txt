@@ -11,3 +11,10 @@ INSERT INTO permissions (`key`,description,resource,action) VALUES
 ('resources:read','List and view resources','resources','read'),
 ('resources:write','Create/modify resources','resources','write'),
 ('audit:read','View audit logs','audit','read');
+
+
+INSERT INTO role_permissions (role_id, permission_id) VALUES (1, 1);
+INSERT INTO role_permissions (role_id, permission_id) VALUES (1, 2);
+INSERT INTO role_permissions (role_id, permission_id) VALUES (1, 3);
+INSERT INTO role_permissions (role_id, permission_id) VALUES (1, 4);
+INSERT INTO role_permissions (role_id, permission_id) VALUES (1, 5);

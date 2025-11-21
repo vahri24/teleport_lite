@@ -7,9 +7,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const onResources = path === "/resources";
   const onUsers = path === "/users";
   const onAudit = path === "/audit";
-
+  const onRoles = path === "/roles";
   // Protect dashboard and resources routes
-  if (onDashboard || onResources || onAudit || onUsers) checkAuth();
+  if (onDashboard || onResources || onAudit || onUsers || onRoles) checkAuth();
 
   // Login handler
   const loginForm = document.getElementById("loginForm");
@@ -43,6 +43,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // Audit page handlers
   if (onAudit) {
     console.log("📜 Loading Audit");
+    loadAuditLogs();
+  }
+
+  // Audit page handlers
+  if (onRoles) {
+    console.log("📜 Loading Roles");
     loadAuditLogs();
   }
 

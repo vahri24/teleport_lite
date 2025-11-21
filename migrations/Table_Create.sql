@@ -1,3 +1,6 @@
+CREATE USER 'minitele'@'%' IDENTIFIED BY 'minitele';
+GRANT ALL PRIVILEGES ON *.* TO 'minitele'@'%';
+
 CREATE TABLE organizations (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(200) NOT NULL,
