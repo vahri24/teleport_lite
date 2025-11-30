@@ -19,5 +19,26 @@
   </div>
 </div>
 
+    <div class="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-100 text-slate-600">
+          <tr>
+            <th class="px-5 py-3 text-left text-xs font-semibold">#</th>
+            <th class="px-5 py-3 text-left text-xs font-semibold">Name</th>
+            <th class="px-5 py-3 text-left text-xs font-semibold">Email</th>
+            <th class="px-5 py-3 text-left text-xs font-semibold">Assigned Roles</th>
+            <th class="px-5 py-3 text-right text-xs font-semibold">Action</th>
+          </tr>
+        </thead>
+        <tbody id="roles-table-body" class="bg-white divide-y divide-slate-100">
+          <!-- Filled by app.js via /api/v1/... -->
+        </tbody>
+      </table>
+
+      <div id="roles-empty-state" class="py-10 text-center text-sm text-slate-400 hidden">
+        No role assignments found.
+      </div>
+    </div>
+
 {{ end }}
 {{ template "layout" . }}

@@ -8,6 +8,7 @@ import (
 
 	"teleport_lite/internal/auth"
 	"teleport_lite/internal/http/handlers"
+
 	//"teleport_lite/internal/models"
 	"teleport_lite/internal/rbac"
 )
@@ -16,68 +17,66 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 	r := gin.Default()
 	r.LoadHTMLGlob("internal/ui/views/*.tmpl")
 	r.Static("/static", "internal/ui/static")
-	
+
 	// ✅ Secure static route for agent download
 	shared := r.Group("/internal/shared")
 	shared.Use(auth.JWT(jwtSecret))
 	{
-	    shared.Static("/", "./internal/shared")
+		shared.Static("/", "./internal/shared")
 	}
 	// favicon fix
 	r.GET("/favicon.ico", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
 	})
 
-    r.GET("/login", renderLogin())
+	r.GET("/login", renderLogin())
 
 	// ✅ Dashboard (PUBLIC PAGE for now so redirect works)
 	r.GET("/dashboard", auth.JWT(jwtSecret), func(c *gin.Context) {
-    claims, exists := c.Get("claims")
-    if !exists {
-        c.Redirect(http.StatusSeeOther, "/login")
-        return
-    }
+		claims, exists := c.Get("claims")
+		if !exists {
+			c.Redirect(http.StatusSeeOther, "/login")
+			return
+		}
 
-    cl := claims.(*auth.Claims)
-    c.HTML(http.StatusOK, "dashboard.tmpl", gin.H{
-        "title":  "Dashboard",
-        "name":   cl.Email,  // or cl.UserID, depending on your Claims struct
-        "org_id": cl.OrgID,
-    	})
+		cl := claims.(*auth.Claims)
+		c.HTML(http.StatusOK, "dashboard.tmpl", gin.H{
+			"title":  "Dashboard",
+			"name":   cl.Email, // or cl.UserID, depending on your Claims struct
+			"org_id": cl.OrgID,
+		})
 	})
 
 	// ✅ Users
 	r.GET("/users", func(c *gin.Context) {
-    c.HTML(http.StatusOK, "users.tmpl", gin.H{
-        "title": "Users",
-    	})
+		c.HTML(http.StatusOK, "users.tmpl", gin.H{
+			"title": "Users",
+		})
 	})
 
 	// ✅ Resource
 	r.GET("/resources", func(c *gin.Context) {
-	c.HTML(http.StatusOK, "resources.tmpl", gin.H{
-		"title": "Resources",
+		c.HTML(http.StatusOK, "resources.tmpl", gin.H{
+			"title": "Resources",
 		})
 	})
 
 	r.GET("/audit", func(c *gin.Context) {
-    c.HTML(http.StatusOK, "audit.tmpl", gin.H{
-        "title": "Audit",
-    	})
+		c.HTML(http.StatusOK, "audit.tmpl", gin.H{
+			"title": "Audit",
+		})
 	})
 
 	r.GET("/roles", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "roles.tmpl", gin.H{
 			"title": "Roles",
-			})
 		})
-
+	})
 
 	// Public routes
 	r.POST("/api/v1/auth/login", handlers.LoginHandler(db, jwtSecret))
 	r.POST("/agents/register", handlers.RegisterAgent(db))
 	r.POST("/agents/heartbeat", handlers.AgentHeartbeat(db))
-	
 
 	// ✅ Protected API routes (still secure)
 	chk := rbac.Checker{DB: db}
@@ -91,11 +90,14 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 		//api.POST("/users/:id/roles", require(chk, "users:assign-role"), assignRole(db))
 		api.GET("/users/connect-list", require(chk, "users:read"), handlers.ListConnectUsers(db))
 
-
 		// Roles
 		api.GET("/roles", require(chk, "roles:read"), handlers.ListRoles(db))
 		api.POST("/roles", require(chk, "roles:write"), handlers.CreateRole(db))
 		api.POST("/roles/:id/permissions", require(chk, "roles:write"), assignPerms(db))
+
+		// Assign_Roles
+		assign := api.Group("/assign")
+		assign.GET("/users", require(chk, "roles:read"), handlers.ListUserRoles(db))
 
 		// Resources
 		api.GET("/resources", require(chk, "resources:read"), handlers.ListResources(db))
@@ -107,7 +109,7 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 
 		// Audit Trail
 		api.GET("/audit", require(chk, "audit:read"), handlers.ListAudit(db))
-		
+
 	}
 
 	// ✅ Remove protected root route to prevent template conflicts
@@ -160,7 +162,6 @@ func createResource(db any) gin.HandlerFunc {
 		c.JSON(http.StatusCreated, gin.H{"message": "resource created (stub)"})
 	}
 }
-
 
 func require(chk rbac.Checker, permKey string) gin.HandlerFunc {
 	return func(c *gin.Context) {
