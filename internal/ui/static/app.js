@@ -49,7 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Audit page handlers
   if (onRoles) {
     console.log("📜 Loading Roles");
-    loadAuditLogs();
+    loadAssignUsers();
   }
 
 });
@@ -573,5 +573,84 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+async function loadAssignUsers() {
+  const loading = document.getElementById("roles-loading");
+  const table   = document.getElementById("roles-table");
+  const empty   = document.getElementById("roles-empty-state");
+  const tbody   = document.getElementById("roles-table-body");
+
+  if (!tbody) return;
+
+  // State awal
+  if (loading) loading.classList.remove("hidden");
+  if (table)   table.classList.add("hidden");
+  if (empty)   empty.classList.add("hidden");
+
+  try {
+    const res = await fetch("/api/v1/assign/users", {
+      method: "GET",
+      credentials: "include",       // 🔑 penting biar cookie JWT ikut
+      headers: { "Accept": "application/json" },
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      console.warn("Not authorized, redirecting to login");
+      window.location.href = "/login";
+      return;
+    }
+
+    if (!res.ok) {
+      console.error("Failed to load assign users:", res.status, await res.text());
+      if (loading) loading.textContent = "Failed to load data.";
+      return;
+    }
+
+    const data = await res.json();
+    const users = Array.isArray(data.users) ? data.users : data;
+
+    tbody.innerHTML = "";
+
+    if (!users || users.length === 0) {
+      if (loading) loading.classList.add("hidden");
+      if (empty)   empty.classList.remove("hidden");
+      return;
+    }
+
+    users.forEach((u, idx) => {
+      // adaptasi field tergantung JSON kamu
+      const name  = u.name || u.Name || "-";
+      const email = u.email || u.Email || "-";
+      const roles = (u.roles || u.Roles || [])
+        .map(r => r.name || r.Name || r.slug || r.Slug)
+        .join(", ") || "-";
+
+      const tr = document.createElement("tr");
+      tr.className = "hover:bg-slate-50 transition";
+
+      tr.innerHTML = `
+        <td class="px-5 py-3 text-sm text-slate-500">${idx + 1}</td>
+        <td class="px-5 py-3 text-sm font-medium text-slate-900">${name}</td>
+        <td class="px-5 py-3 text-sm text-slate-700">${email}</td>
+        <td class="px-5 py-3 text-sm text-slate-700">${roles}</td>
+        <td class="px-5 py-3 text-right">
+          <button
+            class="assign-role-btn text-blue-600 hover:underline text-sm"
+            data-user-id="${u.id || u.ID}"
+          >
+            Manage
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    if (loading) loading.classList.add("hidden");
+    if (table)   table.classList.remove("hidden");
+  } catch (err) {
+    console.error("Error calling /api/v1/assign/users:", err);
+    if (loading) loading.textContent = "Error loading data.";
+  }
+}
 
 
