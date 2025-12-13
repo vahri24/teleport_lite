@@ -36,6 +36,12 @@ func LoginHandler(db *gorm.DB, jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
+		// Prevent login for suspended users
+		if user.Status != models.UserActive {
+			c.JSON(http.StatusForbidden, gin.H{"error": "account suspended"})
+			return
+		}
+
 		// Generate JWT
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"uid":   user.ID,
@@ -52,13 +58,13 @@ func LoginHandler(db *gorm.DB, jwtSecret string) gin.HandlerFunc {
 
 		// ✅ Set JWT as cookie (browser will send it automatically)
 		c.SetCookie(
-			"token",         // name
-			tokenString,     // value
-			3600*24,         // expires in 1 day
-			"/",             // path
-			"",              // domain (same origin)
-			false,           // secure (false for localhost; true for HTTPS)
-			true,            // HttpOnly
+			"token",     // name
+			tokenString, // value
+			3600*24,     // expires in 1 day
+			"/",         // path
+			"",          // domain (same origin)
+			false,       // secure (false for localhost; true for HTTPS)
+			true,        // HttpOnly
 		)
 
 		// ✅ Also return token in JSON (for Postman or JS use)
@@ -70,5 +76,22 @@ func LoginHandler(db *gorm.DB, jwtSecret string) gin.HandlerFunc {
 				"org_id": user.OrgID,
 			},
 		})
+	}
+}
+
+// LogoutHandler clears the auth cookie and redirects to login (or returns JSON).
+func LogoutHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Clear the cookie set at login. Use MaxAge=-1 to delete.
+		c.SetCookie("token", "", -1, "/", "", false, true)
+
+		// If the request expects HTML, redirect to the login page.
+		// Otherwise return JSON confirmation.
+		if c.GetHeader("Accept") == "text/html" || c.Request.Method == "GET" {
+			c.Redirect(http.StatusSeeOther, "/login")
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "logged out"})
 	}
 }

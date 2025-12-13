@@ -1,0 +1,41 @@
+{{ define "profile_content" }}
+
+<!-- Profile Header -->
+<div class="bg-white rounded-2xl shadow p-6 md:p-8 mb-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-2xl font-semibold mb-1">Profile</h2>
+      <p class="text-slate-600 text-sm">Your account details</p>
+    </div>
+    <div>
+      <a href="/dashboard"
+         class="px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition shadow-sm">
+         ← Back to Dashboard
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Profile Card -->
+<div class="bg-white rounded-2xl shadow p-6 max-w-3xl">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="space-y-3">
+      <h3 class="text-sm text-slate-500">Name</h3>
+      <p class="text-lg font-medium text-slate-800">{{ with .User }}{{ .Name }}{{ else }}-{{ end }}</p>
+
+      <h3 class="text-sm text-slate-500 mt-4">Email</h3>
+      <p class="text-sm text-slate-700">{{ with .User }}{{ .Email }}{{ else }}-{{ end }}</p>
+    </div>
+
+    <div class="space-y-3">
+      <h3 class="text-sm text-slate-500">Member Since</h3>
+      <p class="text-sm text-slate-700">{{ with .User }}{{ .CreatedAt }}{{ else }}-{{ end }}</p>
+
+      <h3 class="text-sm text-slate-500 mt-4">Organization</h3>
+      <p class="text-sm text-slate-700">{{ with .User }}{{ .OrgID }}{{ else }}-{{ end }}</p>
+    </div>
+  </div>
+</div>
+
+{{ end }}
+{{ template "layout" . }}

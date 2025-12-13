@@ -38,5 +38,20 @@
       </div>
     </div>
 
+    <!-- Manage Roles Modal -->
+    <div id="manageRolesModal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
+        <h3 class="text-lg font-semibold mb-3">Manage Roles</h3>
+        <div id="manageRolesUserInfo" class="text-sm text-slate-600 mb-4"></div>
+        <div id="manageRolesList" class="grid grid-cols-1 gap-2 max-h-56 overflow-auto mb-4">
+          <!-- checkboxes populated by JS -->
+        </div>
+        <div class="flex justify-end gap-3">
+          <button id="cancelManageRoles" class="px-3 py-2 rounded-lg bg-slate-200 text-slate-700 text-sm hover:bg-slate-300">Cancel</button>
+          <button id="saveManageRoles" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">Save</button>
+        </div>
+      </div>
+    </div>
+
 {{ end }}
 {{ template "layout" . }}

@@ -1,5 +1,5 @@
 // --------------------------- MAIN APP ENTRY --------------------------- //
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   console.log("🚀 app.js loaded");
 
   const path = window.location.pathname;
@@ -11,6 +11,22 @@ document.addEventListener("DOMContentLoaded", () => {
   // Protect dashboard and resources routes
   if (onDashboard || onResources || onAudit || onUsers || onRoles) checkAuth();
 
+  // load current user permissions for client-side checks
+  window.currentUserPermissions = [];
+  window.hasResourceWrite = false;
+  async function loadCurrentUser() {
+    try {
+      const res = await fetch('/api/v1/me', { credentials: 'include' });
+      if (!res.ok) return;
+      const data = await res.json();
+      window.currentUserPermissions = data.permissions || [];
+      window.hasResourceWrite = window.currentUserPermissions.includes('resources:write');
+    } catch (err) {
+      console.error('Failed to load current user permissions', err);
+    }
+  }
+  if (onDashboard || onResources || onUsers) loadCurrentUser();
+
   // Login handler
   const loginForm = document.getElementById("loginForm");
   if (loginForm) loginForm.addEventListener("submit", handleLogin);
@@ -21,7 +37,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Dashboard loaders
   if (onDashboard) {
-    loadTable("/api/v1/roles", "rolesTable", 3);
+    loadTable("/api/v1/roles", "rolesTable", 4);
     loadTable("/api/v1/resources", "resourcesTable", 4);
     loadResourcesChart();
   }
@@ -29,6 +45,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // Users loaders
   if (onUsers) {
     console.log("👤 Loading real Users...");
+    // ensure we have current user permissions before rendering actions
+    await loadCurrentUser();
     loadUsers();
     setupAddUserModal();
   }
@@ -38,6 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("🔌 Loading real local resources...");
     loadLocalResources();
     setupAddResourceModal();
+    setupNoAccessModal();
   }
 
   // Audit page handlers
@@ -101,27 +120,46 @@ async function loadTable(apiPath, tableId, columns) {
   try {
     const res = await fetch(apiPath, { credentials: "include" });
     const data = await res.json();
-
     const table = document.getElementById(tableId);
     if (!table) return;
 
-    const records =
-      data.users || data.roles || data.resources || data.logs || [];
+    const records = data.users || data.roles || data.resources || data.logs || [];
 
-    if (records.length === 0) {
+    if (!records || records.length === 0) {
       table.innerHTML = `<tr><td colspan="${columns}" class="py-4 text-center text-slate-400">No data found</td></tr>`;
       return;
     }
 
+    // Special-case rendering for roles table to ensure stable column order
+    if (tableId === "rolesTable") {
+      table.innerHTML = records
+        .map((r) => {
+          // API may return keys in different casing; prefer canonical lower-case keys
+          const id = r.id ?? r.ID ?? r.created_at ?? "-";
+          const name = r.name ?? r.Name ?? "-";
+          const slug = r.slug ?? r.Slug ?? "-";
+          const users = (r.users_count ?? r.usersCount ?? r.users ?? 0);
+          return `
+            <tr class="border-b last:border-0">
+              <td class="py-2 px-2 whitespace-nowrap text-slate-700">${id ?? "-"}</td>
+              <td class="py-2 px-2 whitespace-nowrap text-slate-700">${name ?? "-"}</td>
+              <td class="py-2 px-2 whitespace-nowrap text-slate-700">${slug ?? "-"}</td>
+              <td class="py-2 px-2 whitespace-nowrap text-slate-700">${users ?? 0}</td>
+            </tr>`;
+        })
+        .join("");
+      return;
+    }
+
+    // Generic renderer for other tables (keeps previous behavior)
     table.innerHTML = records
       .map(
         (r) => `
         <tr class="border-b last:border-0">
           ${Object.values(r)
             .slice(0, columns)
-            .map(
-              (v) =>
-                `<td class="py-2 px-2 whitespace-nowrap text-slate-700">${v ?? "-"}</td>`
+            .map((v) =>
+              `<td class="py-2 px-2 whitespace-nowrap text-slate-700">${v ?? "-"}</td>`
             )
             .join("")}
         </tr>`
@@ -144,25 +182,169 @@ async function loadUsers() {
     table.innerHTML = "";
 
     if (!data.users || data.users.length === 0) {
-      table.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-400">No users found.</td></tr>`;
+      table.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-slate-400">No users found.</td></tr>`;
       return;
     }
 
     data.users.forEach((u, i) => {
+      // Role may come as u.Roles (array) or u.role; handle both
+      let roleText = "-";
+      if (u.Roles && Array.isArray(u.Roles) && u.Roles.length > 0) {
+        roleText = u.Roles.map(r => r.Name || r.name || r.slug || "-").join(", ");
+      } else if (u.role) roleText = u.role;
+
+      const status = u.Status || u.status || "active";
+
+      const uid = u.ID ?? u.id ?? u.Id ?? u.ID;
+      const showAction = false; // initial, visibility toggled after permissions load
+      // Show Activate if suspended, otherwise Deactivate
+      const isSuspended = (String(status).toLowerCase() === 'suspended');
+      const deactivateBtn = `<button data-user-id="${uid}" class="deactivate-btn ${showAction ? '' : 'hidden'} px-3 py-1.5 rounded bg-red-600 text-white text-xs hover:bg-red-700">Deactivate</button>`;
+      const activateBtn = `<button data-user-id="${uid}" class="activate-btn ${showAction ? '' : 'hidden'} px-3 py-1.5 rounded bg-green-600 text-white text-xs hover:bg-green-700">Activate</button>`;
+      const changePwdBtn = `<button data-user-id="${uid}" class="change-pwd-btn ${showAction ? '' : 'hidden'} px-3 py-1.5 rounded bg-slate-600 text-white text-xs hover:bg-slate-700">Change Password</button>`;
+      // wrap action buttons in a flex container to keep consistent alignment
+      const actionBtn = `
+        <div class="flex items-center gap-2">
+          ${isSuspended ? (activateBtn + changePwdBtn) : (deactivateBtn + changePwdBtn)}
+        </div>`;
+
       const row = `
         <tr class="border-b hover:bg-slate-50 transition">
           <td class="py-3 px-4">${i + 1}</td>
-          <td class="py-3 px-4 font-medium text-slate-700">${u.Name}</td>
-          <td class="py-3 px-4 text-slate-600">${u.Email}</td>
-          <td class="py-3 px-4">${u.role || "-"}</td>
-          <td class="py-3 px-4">${u.status || "active"}</td>
+          <td class="py-3 px-4 font-medium text-slate-700">${u.Name || u.name || "-"}</td>
+          <td class="py-3 px-4 text-slate-600">${u.Email || u.email || "-"}</td>
+          <td class="py-3 px-4">${roleText}</td>
+          <td class="py-3 px-4">${status}</td>
+          <td class="py-3 px-4">${actionBtn}</td>
         </tr>`;
       table.insertAdjacentHTML("beforeend", row);
     });
+
+    // After rendering, wire up action buttons and adjust visibility based on permissions
+    updateUserActionVisibility();
+    attachDeactivateHandlers();
+    attachActivateHandlers();
+    attachChangePasswordHandlers();
   } catch (err) {
     console.error("Failed to load users:", err);
-    table.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-red-500">Failed to load users.</td></tr>`;
+    table.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-red-500">Failed to load users.</td></tr>`;
   }
+}
+
+function updateUserActionVisibility() {
+  const allowed = Array.isArray(window.currentUserPermissions) && window.currentUserPermissions.includes('users:assign-role');
+  document.querySelectorAll('.deactivate-btn').forEach(btn => {
+    if (allowed) btn.classList.remove('hidden');
+    else btn.classList.add('hidden');
+  });
+  document.querySelectorAll('.activate-btn').forEach(btn => {
+    if (allowed) btn.classList.remove('hidden');
+    else btn.classList.add('hidden');
+  });
+  document.querySelectorAll('.change-pwd-btn').forEach(btn => {
+    if (allowed) btn.classList.remove('hidden');
+    else btn.classList.add('hidden');
+  });
+}
+
+function attachDeactivateHandlers() {
+  document.querySelectorAll('.deactivate-btn').forEach(btn => {
+    btn.onclick = async (e) => {
+      const userId = e.currentTarget.dataset.userId;
+      if (!userId) return;
+      if (!confirm('Are you sure you want to deactivate this user account?')) return;
+      try {
+        const res = await fetch(`/api/v1/users/${encodeURIComponent(userId)}/deactivate`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert('User deactivated');
+          loadUsers();
+        } else {
+          alert('Failed to deactivate user: ' + (data.error || data.message || res.statusText));
+        }
+      } catch (err) {
+        console.error('Deactivate failed', err);
+        alert('Network error');
+      }
+    };
+  });
+}
+
+function attachActivateHandlers() {
+  document.querySelectorAll('.activate-btn').forEach(btn => {
+    btn.onclick = async (e) => {
+      const userId = e.currentTarget.dataset.userId;
+      if (!userId) return;
+      if (!confirm('Are you sure you want to activate this user account?')) return;
+      try {
+        const res = await fetch(`/api/v1/users/${encodeURIComponent(userId)}/activate`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert('User activated');
+          loadUsers();
+        } else {
+          alert('Failed to activate user: ' + (data.error || data.message || res.statusText));
+        }
+      } catch (err) {
+        console.error('Activate failed', err);
+        alert('Network error');
+      }
+    };
+  });
+}
+
+function attachChangePasswordHandlers() {
+  document.querySelectorAll('.change-pwd-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      const userId = e.currentTarget.dataset.userId;
+      if (!userId) return;
+      const modal = document.getElementById('changePasswordModal');
+      const cpUser = document.getElementById('cpUserId');
+      const cpPassword = document.getElementById('cpPassword');
+      if (!modal || !cpUser || !cpPassword) return;
+      cpUser.value = userId;
+      cpPassword.value = '';
+      modal.classList.remove('hidden');
+    };
+  });
+
+  const cpCancel = document.getElementById('cpCancel');
+  if (cpCancel) cpCancel.onclick = () => document.getElementById('changePasswordModal').classList.add('hidden');
+
+  const cpForm = document.getElementById('changePasswordForm');
+  if (cpForm) cpForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const userId = document.getElementById('cpUserId').value;
+    const password = document.getElementById('cpPassword').value;
+    if (!userId || !password || password.length < 8) {
+      alert('Password must be at least 8 characters');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/v1/users/${encodeURIComponent(userId)}/password`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
+        body: JSON.stringify({password}),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Password updated');
+        document.getElementById('changePasswordModal').classList.add('hidden');
+      } else {
+        alert('Failed to update password: ' + (data.error || data.message || res.statusText));
+      }
+    } catch (err) {
+      console.error('Change password failed', err);
+      alert('Network error');
+    }
+  };
 }
 
 // Hook refresh button
@@ -170,6 +352,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if (document.getElementById("refreshUsers")) {
     loadUsers();
     document.getElementById("refreshUsers").addEventListener("click", loadUsers);
+  }
+  if (document.getElementById("refreshRoles")) {
+    loadTable("/api/v1/roles", "rolesTable", 4);
+    document.getElementById("refreshRoles").addEventListener("click", () => loadTable("/api/v1/roles", "rolesTable", 4));
   }
 });
 
@@ -255,6 +441,11 @@ async function loadLocalResources() {
     // Attach connect handlers
     document.querySelectorAll(".connect-btn").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
+        // If user doesn't have resource write permission, show popup and don't navigate
+        if (!window.hasResourceWrite) {
+          showNoAccess("You don't have access for this resource. Please contact your admin.");
+          return;
+        }
         const host = e.currentTarget.dataset.host;
         await showUserSelectModal(host);
       });
@@ -377,6 +568,25 @@ function setupAddResourceModal() {
 
 }
 
+// --------------------------- NO ACCESS MODAL --------------------------- //
+function setupNoAccessModal() {
+  const modal = document.getElementById("noAccessModal");
+  const closeBtn = document.getElementById("closeNoAccess");
+  if (!modal) return;
+  closeBtn.addEventListener("click", () => modal.classList.add("hidden"));
+}
+
+function showNoAccess(msg) {
+  const modal = document.getElementById("noAccessModal");
+  const msgEl = document.getElementById("noAccessMsg");
+  if (!modal) {
+    alert(msg);
+    return;
+  }
+  if (msgEl) msgEl.textContent = msg;
+  modal.classList.remove("hidden");
+}
+
 // ===== AUDIT TRAIL PAGE =====
 async function loadAuditLogs() {
   const table = document.getElementById("auditTable");
@@ -427,9 +637,9 @@ function setupLogout() {
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", () => {
-      alert("👋 Logged out successfully!");
-      document.cookie = "token=; Max-Age=0; path=/";
-      window.location.href = "/login";
+      // Navigate to server-side logout which clears the HttpOnly cookie
+      // and redirects back to the login page.
+      window.location.href = "/logout";
     });
   }
 }
@@ -625,6 +835,8 @@ async function loadAssignUsers() {
         .map(r => r.name || r.Name || r.slug || r.Slug)
         .join(", ") || "-";
 
+      const roleIds = (u.roles || u.Roles || []).map(r => r.id || r.ID || r.Id).filter(Boolean).join(",");
+
       const tr = document.createElement("tr");
       tr.className = "hover:bg-slate-50 transition";
 
@@ -637,6 +849,8 @@ async function loadAssignUsers() {
           <button
             class="assign-role-btn text-blue-600 hover:underline text-sm"
             data-user-id="${u.id || u.ID}"
+            data-user-name="${name}"
+            data-user-roles="${roleIds}"
           >
             Manage
           </button>
@@ -652,5 +866,87 @@ async function loadAssignUsers() {
     if (loading) loading.textContent = "Error loading data.";
   }
 }
+
+// Setup handlers for Manage buttons (call after loadAssignUsers completes)
+function setupAssignRoleButtons() {
+  document.querySelectorAll('.assign-role-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const userId = btn.getAttribute('data-user-id');
+      const userName = btn.getAttribute('data-user-name');
+      const userRolesCSV = btn.getAttribute('data-user-roles') || '';
+      const currentRoleIds = userRolesCSV === '' ? [] : userRolesCSV.split(',').map(s => s.trim()).filter(Boolean).map(Number);
+
+      // Show modal
+      const modal = document.getElementById('manageRolesModal');
+      const info = document.getElementById('manageRolesUserInfo');
+      const list = document.getElementById('manageRolesList');
+      modal.classList.remove('hidden');
+      info.textContent = `Manage roles for: ${userName} (ID: ${userId})`;
+      list.innerHTML = 'Loading roles...';
+
+      try {
+        const res = await fetch('/api/v1/roles', { credentials: 'include', headers: { 'Accept': 'application/json' } });
+        if (!res.ok) {
+          list.innerHTML = 'Failed to load roles.';
+          return;
+        }
+        const data = await res.json();
+        const roles = data.roles || [];
+        list.innerHTML = '';
+        roles.forEach(r => {
+          const rid = r.id || r.ID || r.Id;
+          const checked = currentRoleIds.includes(Number(rid));
+          const id = `role_chk_${rid}`;
+          const div = document.createElement('div');
+          div.className = 'flex items-center gap-2';
+          div.innerHTML = `
+            <input type="checkbox" id="${id}" data-role-id="${rid}" ${checked ? 'checked' : ''} class="h-4 w-4">
+            <label for="${id}" class="text-sm text-slate-700">${r.name || r.Name || r.slug || r.Slug}</label>
+          `;
+          list.appendChild(div);
+        });
+
+        // attach save handler (remove previous)
+        const saveBtn = document.getElementById('saveManageRoles');
+        saveBtn.onclick = async () => {
+          const checked = Array.from(list.querySelectorAll('input[type=checkbox]:checked')).map(cb => Number(cb.getAttribute('data-role-id')));
+          try {
+            const resp = await fetch(`/api/v1/users/${userId}/roles`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ role_ids: checked }),
+            });
+            if (!resp.ok) {
+              alert('Failed to save roles: ' + resp.status);
+              return;
+            }
+            modal.classList.add('hidden');
+            // refresh list
+            loadAssignUsers();
+          } catch (err) {
+            console.error('Save roles error', err);
+            alert('Error saving roles');
+          }
+        };
+
+        // cancel handler
+        document.getElementById('cancelManageRoles').onclick = () => modal.classList.add('hidden');
+
+      } catch (err) {
+        console.error('Failed to load roles list', err);
+        list.innerHTML = 'Error loading roles.';
+      }
+    });
+  });
+}
+
+// Ensure we wire buttons after DOM updates: simple interval observer
+const assignObserver = setInterval(() => {
+  if (document.querySelectorAll && document.querySelectorAll('.assign-role-btn').length > 0) {
+    setupAssignRoleButtons();
+    clearInterval(assignObserver);
+  }
+}, 300);
 
 

@@ -20,7 +20,7 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 
 	// ✅ Secure static route for agent download
 	shared := r.Group("/internal/shared")
-	shared.Use(auth.JWT(jwtSecret))
+	shared.Use(auth.JWT(db, jwtSecret))
 	{
 		shared.Static("/", "./internal/shared")
 	}
@@ -30,9 +30,13 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 	})
 
 	r.GET("/login", renderLogin())
+	// Logout route clears cookie server-side and redirects to login
+	r.GET("/logout", handlers.LogoutHandler())
+	// Profile (protected)
+	r.GET("/profile", auth.JWT(db, jwtSecret), handlers.ProfileHandler(db))
 
 	// ✅ Dashboard (PUBLIC PAGE for now so redirect works)
-	r.GET("/dashboard", auth.JWT(jwtSecret), func(c *gin.Context) {
+	r.GET("/dashboard", auth.JWT(db, jwtSecret), func(c *gin.Context) {
 		claims, exists := c.Get("claims")
 		if !exists {
 			c.Redirect(http.StatusSeeOther, "/login")
@@ -80,13 +84,18 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 
 	// ✅ Protected API routes (still secure)
 	chk := rbac.Checker{DB: db}
-	authMW := auth.JWT(jwtSecret)
+	authMW := auth.JWT(db, jwtSecret)
 
 	api := r.Group("/api/v1", authMW)
 	{
+		// Current user info & permissions
+		api.GET("/me", handlers.MeHandler(db))
 		// Users
 		api.GET("/users", require(chk, "users:read"), handlers.ListUsers(db))
 		api.POST("/users", require(chk, "users:write"), handlers.CreateUser(db))
+		api.POST("/users/:id/deactivate", require(chk, "users:assign-role"), handlers.DeactivateUser(db))
+		api.POST("/users/:id/activate", require(chk, "users:assign-role"), handlers.ActivateUser(db))
+		api.POST("/users/:id/password", require(chk, "users:assign-role"), handlers.ChangePassword(db))
 		//api.POST("/users/:id/roles", require(chk, "users:assign-role"), assignRole(db))
 		api.GET("/users/connect-list", require(chk, "users:read"), handlers.ListConnectUsers(db))
 
@@ -98,6 +107,9 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 		// Assign_Roles
 		assign := api.Group("/assign")
 		assign.GET("/users", require(chk, "roles:read"), handlers.ListUserRoles(db))
+
+		// Assign roles to a user
+		api.POST("/users/:id/roles", require(chk, "users:assign-role"), handlers.AssignRoles(db))
 
 		// Resources
 		api.GET("/resources", require(chk, "resources:read"), handlers.ListResources(db))

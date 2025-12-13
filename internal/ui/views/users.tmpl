@@ -99,14 +99,34 @@
           <th class="py-3 px-4">Email</th>
           <th class="py-3 px-4">Role</th>
           <th class="py-3 px-4">Status</th>
+          <th class="py-3 px-4">Actions</th>
         </tr>
       </thead>
       <tbody id="usersTable">
         <tr>
-          <td colspan="5" class="py-4 text-center text-slate-400">Loading users...</td>
+          <td colspan="6" class="py-4 text-center text-slate-400">Loading users...</td>
         </tr>
       </tbody>
     </table>
+  </div>
+</div>
+
+<!-- Change Password Modal -->
+<div id="changePasswordModal" class="hidden fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+    <h3 class="text-lg font-semibold mb-2">Change User Password</h3>
+    <p class="text-sm text-slate-600 mb-4">Set a new password for the selected user.</p>
+    <form id="changePasswordForm" class="space-y-3">
+      <input type="hidden" id="cpUserId" />
+      <div>
+        <label class="block text-sm mb-1">New Password</label>
+        <input id="cpPassword" type="password" minlength="8" class="w-full border rounded px-3 py-2" required />
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" id="cpCancel" class="px-3 py-2 bg-slate-200 rounded">Cancel</button>
+        <button type="submit" class="px-3 py-2 bg-blue-600 text-white rounded">Save</button>
+      </div>
+    </form>
   </div>
 </div>
 
