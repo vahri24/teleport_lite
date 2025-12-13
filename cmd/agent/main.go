@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+
 	//"fmt"
 	"log"
 	"net"
@@ -20,6 +21,61 @@ import (
 
 	"golang.org/x/crypto/ssh"
 )
+
+// installAuthorizedKey appends the public key file to the current user's
+// ~/.ssh/authorized_keys if it's not already present. It creates ~/.ssh
+// with 0700 and ensures authorized_keys has 0600 permissions.
+func installAuthorizedKey(pubPath string) error {
+	usr, err := user.Current()
+	if err != nil {
+		return err
+	}
+	sshDir := filepath.Join(usr.HomeDir, ".ssh")
+	authFile := filepath.Join(sshDir, "authorized_keys")
+
+	if err := os.MkdirAll(sshDir, 0700); err != nil {
+		return err
+	}
+
+	pubBytes, err := os.ReadFile(pubPath)
+	if err != nil {
+		return err
+	}
+	pubStr := strings.TrimSpace(string(pubBytes))
+
+	// Read existing authorized_keys if present
+	existing := ""
+	if b, err := os.ReadFile(authFile); err == nil {
+		existing = string(b)
+		// quick check for exact line presence
+		if strings.Contains(existing, pubStr) {
+			return nil // already installed
+		}
+	}
+
+	// Append the key
+	f, err := os.OpenFile(authFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// Ensure newline separation
+	if len(existing) > 0 && !strings.HasSuffix(existing, "\n") {
+		if _, err := f.WriteString("\n"); err != nil {
+			return err
+		}
+	}
+	if _, err := f.WriteString(pubStr + "\n"); err != nil {
+		return err
+	}
+	// Ensure permissions
+	if err := os.Chmod(authFile, 0600); err != nil {
+		// non-fatal
+		log.Printf("⚠️ unable to chmod %s: %v", authFile, err)
+	}
+	return nil
+}
 
 func main() {
 	controllerURL := os.Getenv("CONTROLLER_URL") // e.g., http://192.168.1.10:8080
@@ -41,6 +97,13 @@ func main() {
 		log.Fatalf("❌ keygen failed: %v", err)
 	}
 
+	// Ensure public key is present in ~/.ssh/authorized_keys
+	if err := installAuthorizedKey(pub); err != nil {
+		log.Printf("⚠️ failed to install public key to authorized_keys: %v", err)
+	} else {
+		log.Println("✅ public key installed to authorized_keys (or already present)")
+	}
+
 	pubBytes, _ := os.ReadFile(pub)
 	pubStr := strings.TrimSpace(string(pubBytes))
 
@@ -48,12 +111,12 @@ func main() {
 	privStr := strings.TrimSpace(string(privBytes))
 
 	payload := map[string]string{
-		"hostname":   hostname,
-		"ip":         ip,
-		"os":         osVersion,
-		"public_key": pubStr,
+		"hostname":    hostname,
+		"ip":          ip,
+		"os":          osVersion,
+		"public_key":  pubStr,
 		"private_key": privStr,
-		"role":       "agent",
+		"role":        "agent",
 	}
 
 	body, _ := json.Marshal(payload)
