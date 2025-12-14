@@ -7,7 +7,11 @@
       <h2 class="text-2xl font-semibold mb-1">Profile</h2>
       <p class="text-slate-600 text-sm">Your account details</p>
     </div>
-    <div>
+    <div class="flex items-center gap-2">
+      <button id="profileChangePasswordBtn"
+        class="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow transition">
+        Change Password
+      </button>
       <a href="/dashboard"
          class="px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition shadow-sm">
          ← Back to Dashboard
@@ -33,6 +37,29 @@
 
       <h3 class="text-sm text-slate-500 mt-4">Organization</h3>
       <p class="text-sm text-slate-700">{{ with .User }}{{ .OrgID }}{{ else }}-{{ end }}</p>
+    </div>
+  </div>
+  <div id="profileChangePasswordModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+      <h3 class="text-lg font-semibold mb-4">Change Password</h3>
+      <form id="profileChangePasswordForm" class="space-y-3">
+        <div>
+          <label class="block text-sm mb-1 text-slate-600" for="profileCurrentPassword">Current Password</label>
+          <input type="password" id="profileCurrentPassword" class="w-full border rounded px-3 py-2" required minlength="8" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1 text-slate-600" for="profileNewPassword">New Password</label>
+          <input type="password" id="profileNewPassword" class="w-full border rounded px-3 py-2" required minlength="8" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1 text-slate-600" for="profileConfirmPassword">Confirm New Password</label>
+          <input type="password" id="profileConfirmPassword" class="w-full border rounded px-3 py-2" required minlength="8" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button id="profileChangePasswordCancel" type="button" class="px-3 py-2 bg-slate-200 rounded-lg">Cancel</button>
+          <button id="profileChangePasswordSubmit" type="submit" class="px-3 py-2 bg-blue-600 text-white rounded-lg">Save</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>

@@ -103,6 +103,75 @@ func ChangePassword(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+// ChangeMyPassword allows the currently authenticated user to update their own password.
+func ChangeMyPassword(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claimsI, ok := c.Get("claims")
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			return
+		}
+		cl := claimsI.(*auth.Claims)
+
+		var payload struct {
+			CurrentPassword string `json:"current_password" binding:"required"`
+			NewPassword     string `json:"new_password" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&payload); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if len(payload.NewPassword) < 8 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "new password must be at least 8 characters"})
+			return
+		}
+
+		var user models.User
+		if err := db.First(&user, cl.UserID).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			return
+		}
+
+		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(payload.CurrentPassword)); err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "current password is incorrect"})
+			return
+		}
+
+		if payload.CurrentPassword == payload.NewPassword {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "new password must be different from current password"})
+			return
+		}
+
+		hash, err := bcrypt.GenerateFromPassword([]byte(payload.NewPassword), bcrypt.DefaultCost)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
+			return
+		}
+
+		if err := db.Model(&user).Update("password_hash", string(hash)).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		metaJSON, _ := json.Marshal(map[string]interface{}{"self_change": true})
+		audit := models.AuditLog{
+			OrgID:         int64(user.OrgID),
+			UserID:        user.ID,
+			Action:        "user.change_password_self",
+			ResourceType:  "user",
+			ResourceID:    user.ID,
+			Metadata:      datatypes.JSON(metaJSON),
+			IP:            c.ClientIP(),
+			UserAgent:     c.GetHeader("User-Agent"),
+			InitiatorName: user.Name,
+			CreatedAt:     time.Now(),
+		}
+		_ = db.Create(&audit).Error
+
+		c.JSON(http.StatusOK, gin.H{"message": "password updated"})
+	}
+}
+
 // AssignRoles replaces the roles assigned to a user with the provided list.
 func AssignRoles(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -281,6 +350,7 @@ func UpdateUserAccess(db *gorm.DB) gin.HandlerFunc {
 				ResourceID  int64  `json:"resource_id"`
 				ConnectUser string `json:"connect_user"`
 			} `json:"access"`
+			ConnectUsers []string `json:"connect_users"`
 		}
 		if err := c.ShouldBindJSON(&payload); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -290,6 +360,61 @@ func UpdateUserAccess(db *gorm.DB) gin.HandlerFunc {
 		var user models.User
 		if err := db.First(&user, id).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			return
+		}
+
+		normalizeUsers := func(in []string) []string {
+			seen := map[string]struct{}{}
+			out := make([]string, 0, len(in))
+			for _, v := range in {
+				val := strings.TrimSpace(v)
+				if val == "" {
+					continue
+				}
+				if _, exists := seen[val]; exists {
+					continue
+				}
+				seen[val] = struct{}{}
+				out = append(out, val)
+			}
+			return out
+		}
+
+		connectUsersOnly := normalizeUsers(payload.ConnectUsers)
+
+		if len(payload.Access) == 0 {
+			newConnectUsers := strings.Join(connectUsersOnly, ",")
+			if err := db.Model(&user).Update("connect_user", newConnectUsers).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			// Audit log for simple connect_user update
+			var initiatorName string
+			if claimsI, ok := c.Get("claims"); ok {
+				if cl, ok := claimsI.(*auth.Claims); ok {
+					var u models.User
+					if err := db.First(&u, cl.UserID).Error; err == nil {
+						initiatorName = u.Name
+					}
+				}
+			}
+			metaJSON, _ := json.Marshal(map[string]interface{}{"connect_users": connectUsersOnly})
+			audit := models.AuditLog{
+				OrgID:         int64(user.OrgID),
+				UserID:        0,
+				Action:        "user.assign_access",
+				ResourceType:  "user",
+				ResourceID:    user.ID,
+				Metadata:      datatypes.JSON(metaJSON),
+				IP:            c.ClientIP(),
+				UserAgent:     c.GetHeader("User-Agent"),
+				InitiatorName: initiatorName,
+				CreatedAt:     time.Now(),
+			}
+			_ = db.Create(&audit).Error
+
+			c.JSON(http.StatusOK, gin.H{"message": "access updated"})
 			return
 		}
 
@@ -306,18 +431,45 @@ func UpdateUserAccess(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		seenConnectUsers := map[string]struct{}{}
+		var connectUserList []string
+		addConnectUser := func(name string) {
+			trimmed := strings.TrimSpace(name)
+			if trimmed == "" {
+				return
+			}
+			if _, exists := seenConnectUsers[trimmed]; exists {
+				return
+			}
+			seenConnectUsers[trimmed] = struct{}{}
+			connectUserList = append(connectUserList, trimmed)
+		}
+		for _, cu := range connectUsersOnly {
+			addConnectUser(cu)
+		}
+
 		for _, a := range payload.Access {
+			trimmedUser := strings.TrimSpace(a.ConnectUser)
 			ura := models.UserResourceAccess{
 				OrgID:       uint64(user.OrgID),
 				UserID:      user.ID,
 				ResourceID:  uint64(a.ResourceID),
-				ConnectUser: a.ConnectUser,
+				ConnectUser: trimmedUser,
 			}
 			if err := tx.Create(&ura).Error; err != nil {
 				tx.Rollback()
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
+			addConnectUser(trimmedUser)
+		}
+
+		newConnectUsers := strings.Join(connectUserList, ",")
+		user.ConnectUser = newConnectUsers
+		if err := tx.Model(&user).Update("connect_user", newConnectUsers).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
 		}
 
 		if err := tx.Commit().Error; err != nil {
@@ -340,7 +492,7 @@ func UpdateUserAccess(db *gorm.DB) gin.HandlerFunc {
 		// Use simple JSON via datatypes
 		metaEntries := make([]map[string]interface{}, 0, len(payload.Access))
 		for _, a := range payload.Access {
-			metaEntries = append(metaEntries, map[string]interface{}{"resource_id": a.ResourceID, "connect_user": a.ConnectUser})
+			metaEntries = append(metaEntries, map[string]interface{}{"resource_id": a.ResourceID, "connect_user": strings.TrimSpace(a.ConnectUser)})
 		}
 		metaJSON, _ := json.Marshal(metaEntries)
 		audit := models.AuditLog{

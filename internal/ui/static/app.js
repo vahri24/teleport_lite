@@ -8,8 +8,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const onUsers = path === "/users";
   const onAudit = path === "/audit";
   const onRoles = path === "/roles";
+  const onProfile = path === "/profile";
   // Protect dashboard and resources routes
-  if (onDashboard || onResources || onAudit || onUsers || onRoles) checkAuth();
+  if (onDashboard || onResources || onAudit || onUsers || onRoles || onProfile) checkAuth();
 
   // load current user permissions for client-side checks
   window.currentUserPermissions = [];
@@ -69,6 +70,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (onRoles) {
     console.log("📜 Loading Roles");
     loadAssignUsers();
+  }
+
+  if (onProfile) {
+    setupProfilePasswordModal();
   }
 
 });
@@ -363,6 +368,92 @@ function attachChangePasswordHandlers() {
   };
 }
 
+function setupProfilePasswordModal() {
+  const btn = document.getElementById('profileChangePasswordBtn');
+  const modal = document.getElementById('profileChangePasswordModal');
+  const form = document.getElementById('profileChangePasswordForm');
+  const cancelBtn = document.getElementById('profileChangePasswordCancel');
+  const submitBtn = document.getElementById('profileChangePasswordSubmit');
+  const currentInput = document.getElementById('profileCurrentPassword');
+  const newInput = document.getElementById('profileNewPassword');
+  const confirmInput = document.getElementById('profileConfirmPassword');
+
+  if (!btn || !modal || !form || !submitBtn || !currentInput || !newInput || !confirmInput) return;
+
+  const closeModal = () => {
+    modal.classList.add('hidden');
+    form.reset();
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Save';
+  };
+
+  btn.addEventListener('click', () => {
+    form.reset();
+    modal.classList.remove('hidden');
+  });
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeModal();
+    });
+  }
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const current = currentInput.value.trim();
+    const newPassword = newInput.value.trim();
+    const confirmPassword = confirmInput.value.trim();
+
+    if (!current || !newPassword) {
+      alert('Please fill in all password fields.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      alert('New password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      alert('Password confirmation does not match.');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+    try {
+      const res = await fetch('/api/v1/me/password', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_password: current, new_password: newPassword }),
+      });
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (err) {
+        console.warn('Failed to parse password response', err);
+      }
+      if (!res.ok) {
+        alert('Failed to change password: ' + (data.error || res.statusText));
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save';
+        return;
+      }
+      alert('Password updated');
+      closeModal();
+    } catch (err) {
+      console.error('Failed to change password', err);
+      alert('Network error changing password');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Save';
+    }
+  });
+}
+
 // Hook refresh button
 document.addEventListener("DOMContentLoaded", () => {
   if (document.getElementById("refreshUsers")) {
@@ -543,101 +634,72 @@ async function showUserSelectModal(host) {
 async function openAssignAccessModal(userId) {
   const modal = document.getElementById('assignAccessModal');
   const info = document.getElementById('assignAccessInfo');
-  const listEl = document.getElementById('assignAccessList');
+  const connectInput = document.getElementById('assignConnectUsers');
   const saveBtn = document.getElementById('assignAccessSave');
   const cancelBtn = document.getElementById('assignAccessCancel');
 
-  if (!modal || !listEl || !saveBtn || !cancelBtn) return;
+  if (!modal || !connectInput || !saveBtn || !cancelBtn) return;
   modal.classList.remove('hidden');
   info.textContent = `User ID: ${userId}`;
-  listEl.innerHTML = 'Loading resources...';
+  connectInput.value = '';
+  connectInput.disabled = true;
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Loading...';
 
   try {
-    const [rRes, uRes] = await Promise.all([
-      fetch('/api/v1/resources', { credentials: 'include' }),
-      fetch('/api/v1/users', { credentials: 'include' }),
-    ]);
-    const rData = await rRes.json();
+    const uRes = await fetch('/api/v1/users', { credentials: 'include' });
     const uData = await uRes.json();
-    const resources = rData.resources || [];
     const users = uData.users || [];
     const user = users.find(uu => String(uu.ID) === String(userId) || String(uu.id) === String(userId));
-    const assigned = user && (user.access_resources || user.resource_access || user.resources) ? (user.access_resources || user.resource_access || user.resources) : [];
-
-    listEl.innerHTML = '';
-    resources.forEach(r => {
-      const id = `assign_res_${r.ID}`;
-      // assigned may be array of ids or array of objects {resource_id, connect_user}
-      let isChecked = false;
-      let preUser = '';
-      if (Array.isArray(assigned)) {
-        assigned.forEach(a => {
-          if (typeof a === 'number' || typeof a === 'string') {
-            if (String(a) === String(r.ID)) isChecked = true;
-          } else if (a && (a.resource_id || a.resourceId || a.id)) {
-            const rid = a.resource_id || a.resourceId || a.id;
-            if (String(rid) === String(r.ID)) {
-              isChecked = true;
-              preUser = a.connect_user || a.connectUser || a.username || '';
-            }
-          }
-        });
+    if (user) {
+      const existing = user.connect_user || user.ConnectUser || '';
+      if (existing) {
+        const connectUsers = existing.split(',').map(u => u.trim()).filter(Boolean);
+        connectInput.value = connectUsers.join('\n');
       }
-
-      const item = document.createElement('div');
-      item.className = 'flex items-center gap-2 py-1';
-      item.innerHTML = `
-        <input type="checkbox" id="${id}" data-resource-id="${r.ID}" ${isChecked ? 'checked' : ''} />
-        <label for="${id}" class="text-sm flex-1">${r.Name} (${r.Host})</label>
-        <input type="text" placeholder="connect_user (optional)" class="connect-user-input border rounded px-2 py-1 text-sm w-36" data-resource-id="${r.ID}" value="${preUser}">
-      `;
-      listEl.appendChild(item);
-    });
-
-    cancelBtn.onclick = () => modal.classList.add('hidden');
-
-    saveBtn.onclick = async () => {
-      const checked = Array.from(listEl.querySelectorAll('input[type=checkbox]:checked'));
-      const access = checked.map(c => {
-        const rid = Number(c.getAttribute('data-resource-id'));
-        const input = listEl.querySelector(`input.connect-user-input[data-resource-id="${rid}"]`);
-        const username = input ? input.value.trim() : '';
-        return { resource_id: rid, connect_user: username };
-      }).filter(a => a.resource_id);
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Saving...';
-      try {
-        const res = await fetch(`/api/v1/users/${encodeURIComponent(userId)}/access`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ access }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          alert('Failed to save: ' + (data.error || data.message || res.statusText));
-          saveBtn.disabled = false;
-          saveBtn.textContent = 'Save';
-          return;
-        }
-        modal.classList.add('hidden');
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save';
-        // refresh users view to reflect changes
-        await loadUsers();
-        alert('Access updated');
-      } catch (err) {
-        console.error('Failed to save access', err);
-        alert('Network error saving access');
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save';
-      }
-    };
-
+    }
   } catch (err) {
-    console.error('Failed to load resources/users for access assignment', err);
-    listEl.innerHTML = '<div class="text-sm text-red-600">Failed to load resources</div>';
+    console.error('Failed to load user for connect access', err);
+  } finally {
+    connectInput.disabled = false;
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
   }
+
+  cancelBtn.onclick = () => modal.classList.add('hidden');
+
+  saveBtn.onclick = async () => {
+    const raw = connectInput.value || '';
+    const connectUsers = Array.from(new Set(raw.split(/[\n,]+/).map(v => v.trim()).filter(Boolean)));
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    try {
+      const res = await fetch(`/api/v1/users/${encodeURIComponent(userId)}/access`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connect_users: connectUsers }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert('Failed to save: ' + (data.error || data.message || res.statusText));
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+        return;
+      }
+      modal.classList.add('hidden');
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+      await loadUsers();
+      alert('Connect users updated');
+    } catch (err) {
+      console.error('Failed to save connect users', err);
+      alert('Network error saving connect users');
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
+  };
 }
 
 // --------------------------- SSH CONNECT --------------------------- //
@@ -1233,5 +1295,3 @@ const assignObserver = setInterval(() => {
     clearInterval(assignObserver);
   }
 }, 300);
-
-

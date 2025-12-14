@@ -90,6 +90,7 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 	{
 		// Current user info & permissions
 		api.GET("/me", handlers.MeHandler(db))
+		api.POST("/me/password", handlers.ChangeMyPassword(db))
 		// Users
 		api.GET("/users", require(chk, "users:read"), handlers.ListUsers(db))
 		api.POST("/users", require(chk, "users:write"), handlers.CreateUser(db))
