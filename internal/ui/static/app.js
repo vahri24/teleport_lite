@@ -63,7 +63,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Audit page handlers
   if (onAudit) {
     console.log("📜 Loading Audit");
-    loadAuditLogs();
+    initAuditPage();
   }
 
   // Audit page handlers
@@ -104,6 +104,24 @@ async function handleLogin(e) {
     console.error("⚠️ Login error:", err);
     alert("Network error");
   }
+}
+
+function setCookieValue(name, value, days = 7) {
+  if (value === undefined || value === null || value === "") {
+    document.cookie = `${name}=; expires=${new Date(0).toUTCString()}; path=/`;
+    return;
+  }
+  const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
+}
+
+function getCookieValue(name) {
+  const pairs = document.cookie ? document.cookie.split("; ") : [];
+  for (const pair of pairs) {
+    const [k, v] = pair.split("=");
+    if (k === name) return decodeURIComponent(v || "");
+  }
+  return "";
 }
 
 // --------------------------- AUTH GUARD --------------------------- //
@@ -703,13 +721,180 @@ async function openAssignAccessModal(userId) {
 }
 
 // --------------------------- SSH CONNECT --------------------------- //
-function openSSH(host, user) {
-  const modal = document.getElementById("sshModal");
-  const closeBtn = document.getElementById("closeSSH");
-  const termEl = document.getElementById("terminal");
+const sshState = {
+  modal: null,
+  closeBtn: null,
+  tabBar: null,
+  tabList: null,
+  newBtn: null,
+  sessionsWrap: null,
+  emptyTabs: null,
+  emptyState: null,
+  sessions: new Map(),
+  activeId: null,
+  seq: 0,
+  resizeHandler: null,
+};
 
-  modal.classList.remove("hidden");
-  termEl.innerHTML = "";
+function ensureSSHState() {
+  if (!sshState.modal) {
+    sshState.modal = document.getElementById("sshModal");
+    sshState.closeBtn = document.getElementById("closeSSH");
+    sshState.tabBar = document.getElementById("sshTabBar");
+    sshState.tabList = document.getElementById("sshTabList");
+    sshState.newBtn = document.getElementById("sshNewSession");
+    sshState.sessionsWrap = document.getElementById("sshSessions");
+    sshState.emptyTabs = document.getElementById("sshEmptyTabs");
+    sshState.emptyState = document.getElementById("sshEmptyState");
+
+    if (sshState.closeBtn) {
+      sshState.closeBtn.onclick = () => {
+        closeAllSSHSessions();
+        if (sshState.modal) sshState.modal.classList.add("hidden");
+      };
+    }
+    if (sshState.newBtn) {
+      sshState.newBtn.addEventListener("click", () => {
+        if (!sshState.activeId) {
+          alert("Connect to a resource first before opening a new terminal.");
+          return;
+        }
+        const active = sshState.sessions.get(sshState.activeId);
+        if (active) openSSH(active.host, active.user);
+      });
+    }
+  }
+
+  if (!sshState.resizeHandler) {
+    sshState.resizeHandler = () => {
+      sshState.sessions.forEach((session) => {
+        try {
+          session.fit && session.fit.fit();
+        } catch (err) {
+          console.warn("Failed to resize SSH session", err);
+        }
+      });
+    };
+    window.addEventListener("resize", sshState.resizeHandler);
+  }
+
+  return sshState.modal && sshState.tabList && sshState.sessionsWrap;
+}
+
+function updateSSHEMptyState() {
+  const hasSessions = sshState.sessions.size > 0;
+  if (sshState.emptyTabs) {
+    sshState.emptyTabs.classList.toggle("hidden", hasSessions);
+  }
+  if (sshState.emptyState) {
+    sshState.emptyState.classList.toggle("hidden", hasSessions);
+  }
+  if (sshState.newBtn) {
+    sshState.newBtn.disabled = sshState.sessions.size === 0;
+    sshState.newBtn.classList.toggle('opacity-50', sshState.newBtn.disabled);
+    sshState.newBtn.classList.toggle('cursor-not-allowed', sshState.newBtn.disabled);
+  }
+}
+
+function activateSSHSession(sessionId) {
+  sshState.activeId = sessionId;
+  sshState.sessions.forEach((session, id) => {
+    const isActive = id === sessionId;
+    if (session.tabEl) {
+      session.tabEl.classList.toggle("bg-white", isActive);
+      session.tabEl.classList.toggle("shadow", isActive);
+      session.tabEl.classList.toggle("border", isActive);
+    }
+    if (session.containerEl) {
+      session.containerEl.classList.toggle("hidden", !isActive);
+    }
+    if (isActive) {
+      try {
+        session.fit && session.fit.fit();
+      } catch (err) {
+        console.warn("Failed to fit SSH session", err);
+      }
+    }
+  });
+}
+
+function closeSSHSession(sessionId) {
+  const session = sshState.sessions.get(sessionId);
+  if (!session) return;
+  try {
+    if (session.ws) session.ws.close();
+  } catch {}
+  try {
+    if (session.term && session.term.dispose) session.term.dispose();
+  } catch {}
+  if (session.tabEl) session.tabEl.remove();
+  if (session.containerEl) session.containerEl.remove();
+  sshState.sessions.delete(sessionId);
+  if (sshState.sessions.size === 0) {
+    sshState.activeId = null;
+    if (sshState.modal) sshState.modal.classList.add("hidden");
+  } else if (sshState.activeId === sessionId) {
+    const next = sshState.sessions.keys().next();
+    if (!next.done) activateSSHSession(next.value);
+  }
+  updateSSHEMptyState();
+}
+
+function closeAllSSHSessions() {
+  Array.from(sshState.sessions.keys()).forEach((id) =>
+    closeSSHSession(id)
+  );
+  sshState.sessions.clear();
+  sshState.activeId = null;
+  if (sshState.tabList) {
+    sshState.tabList.innerHTML = "";
+    if (sshState.emptyTabs) sshState.tabList.appendChild(sshState.emptyTabs);
+  }
+  if (sshState.sessionsWrap) {
+    sshState.sessionsWrap.innerHTML = "";
+    if (sshState.emptyState) sshState.sessionsWrap.appendChild(sshState.emptyState);
+  }
+  updateSSHEMptyState();
+}
+
+function openSSH(host, user) {
+  if (!ensureSSHState()) {
+    alert("SSH modal not available.");
+    return;
+  }
+
+  sshState.modal.classList.remove("hidden");
+  updateSSHEMptyState();
+
+  const sessionId = `ssh-${Date.now()}-${++sshState.seq}`;
+  const label = `${user}@${host}`;
+
+  const tab = document.createElement("div");
+  tab.className =
+    "ssh-tab flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-100 text-slate-700 cursor-pointer hover:bg-slate-200 transition border border-transparent";
+  tab.dataset.sessionId = sessionId;
+  tab.innerHTML = `<span class="truncate max-w-[160px]">${label}</span>`;
+  tab.addEventListener("click", () => activateSSHSession(sessionId));
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "text-slate-500 hover:text-slate-700 text-lg leading-none";
+  closeBtn.innerHTML = "&times;";
+  closeBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeSSHSession(sessionId);
+  });
+  tab.appendChild(closeBtn);
+  if (sshState.tabList) sshState.tabList.appendChild(tab);
+
+  const container = document.createElement("div");
+  container.dataset.sessionId = sessionId;
+  container.className =
+    "h-[65vh] w-full rounded-lg border border-slate-200 overflow-hidden bg-slate-900 text-white hidden";
+  sshState.sessionsWrap.appendChild(container);
+
+  if (sshState.emptyState && sshState.emptyState.parentElement === sshState.sessionsWrap) {
+    sshState.emptyState.classList.add("hidden");
+  }
 
   const term = new Terminal({
     cursorBlink: true,
@@ -721,7 +906,7 @@ function openSSH(host, user) {
 
   const fit = new window.FitAddon.FitAddon();
   term.loadAddon(fit);
-  term.open(termEl);
+  term.open(container);
   fit.fit();
 
   const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -743,21 +928,29 @@ function openSSH(host, user) {
     else term.write(String(ev.data));
   };
 
-  ws.onclose = () => term.write("\r\n\x1b[33m[Disconnected]\x1b[0m\r\n");
-  ws.onerror = () => term.write("\r\n\x1b[31m[WebSocket error]\x1b[0m\r\n");
+  ws.onclose = () =>
+    term.write("\r\n\x1b[33m[Disconnected]\x1b[0m\r\n");
+  ws.onerror = () =>
+    term.write("\r\n\x1b[31m[WebSocket error]\x1b[0m\r\n");
 
   term.onData((data) => {
     if (ws.readyState === WebSocket.OPEN)
       ws.send(new TextEncoder().encode(data));
   });
 
-  window.addEventListener("resize", () => fit.fit());
-  closeBtn.onclick = () => {
-    try {
-      ws.close();
-    } catch {}
-    modal.classList.add("hidden");
-  };
+  sshState.sessions.set(sessionId, {
+    id: sessionId,
+    host,
+    user,
+    tabEl: tab,
+    containerEl: container,
+    term,
+    fit,
+    ws,
+  });
+
+  activateSSHSession(sessionId);
+  updateSSHEMptyState();
 }
 
 // --------------------------- ADD RESOURCE MODAL --------------------------- //
@@ -890,48 +1083,152 @@ function showNoAccess(msg) {
 }
 
 // ===== AUDIT TRAIL PAGE =====
+const auditState = {
+  limit: 20,
+  cursor: null,
+  nextCursor: null,
+  search: "",
+  searchTimer: null,
+  statusEl: null,
+};
+
+function initAuditPage() {
+  const searchInput = document.getElementById("searchAudit");
+  const nextBtn = document.getElementById("auditNext");
+  const resetBtn = document.getElementById("auditReset");
+  const refreshBtn = document.getElementById("refreshAudit");
+  auditState.statusEl = document.getElementById("auditPageStatus");
+
+  auditState.search = getCookieValue("audit_search") || "";
+  const savedCursor = getCookieValue("audit_cursor");
+  auditState.cursor = savedCursor ? savedCursor : null;
+
+  if (searchInput) searchInput.value = auditState.search;
+
+  const triggerReload = () => {
+    if (auditState.searchTimer) clearTimeout(auditState.searchTimer);
+    auditState.searchTimer = setTimeout(() => loadAuditLogs(), 350);
+  };
+
+  if (searchInput) {
+    searchInput.addEventListener("input", () => {
+      auditState.search = searchInput.value.trim();
+      setCookieValue("audit_search", auditState.search);
+      auditState.cursor = null;
+      setCookieValue("audit_cursor", "");
+      triggerReload();
+    });
+  }
+
+  if (nextBtn) {
+    nextBtn.addEventListener("click", () => {
+      if (!auditState.nextCursor) return;
+      auditState.cursor = String(auditState.nextCursor);
+      setCookieValue("audit_cursor", auditState.cursor);
+      loadAuditLogs();
+    });
+  }
+
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      auditState.cursor = null;
+      setCookieValue("audit_cursor", "");
+      loadAuditLogs();
+    });
+  }
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", () => {
+      auditState.cursor = null;
+      setCookieValue("audit_cursor", "");
+      loadAuditLogs();
+    });
+  }
+
+  loadAuditLogs();
+}
+
+function updateAuditControls(count) {
+  const nextBtn = document.getElementById("auditNext");
+  if (nextBtn) {
+    const disabled = !auditState.nextCursor;
+    nextBtn.disabled = disabled;
+    nextBtn.classList.toggle("opacity-50", disabled);
+    nextBtn.classList.toggle("cursor-not-allowed", disabled);
+  }
+  const statusEl = auditState.statusEl || document.getElementById("auditPageStatus");
+  if (statusEl) {
+    let text = count > 0 ? `Showing ${count} logs` : "No logs";
+    if (auditState.search) text += ` for "${auditState.search}"`;
+    if (auditState.cursor) text += ` after ID ${auditState.cursor}`;
+    else text += " from latest";
+    statusEl.textContent = text + ".";
+  }
+}
+
 async function loadAuditLogs() {
   const table = document.getElementById("auditTable");
   if (!table) return;
 
-  try {
-    const res = await fetch("/api/v1/audit", { credentials: "include" });
-    const data = await res.json();
+  table.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-slate-400">Loading audit logs...</td></tr>`;
 
-    table.innerHTML = "";
+  try {
+    const params = new URLSearchParams();
+    params.append("limit", String(auditState.limit));
+    if (auditState.search) params.append("q", auditState.search);
+    if (auditState.cursor) params.append("after_id", auditState.cursor);
+    const query = params.toString();
+    const url = query ? `/api/v1/audit?${query}` : "/api/v1/audit";
+
+    const res = await fetch(url, { credentials: "include" });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || res.statusText);
+    }
 
     const logs = data.logs || data.Audit || [];
+    table.innerHTML = "";
 
     if (logs.length === 0) {
       table.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-slate-400">No audit logs found.</td></tr>`;
+      auditState.nextCursor = null;
+      setCookieValue("audit_next_cursor", "");
+      updateAuditControls(0);
       return;
     }
-    
+
     logs.forEach((log, i) => {
+      const number = log.ID ?? log.id ?? (auditState.cursor ? Number(auditState.cursor) + (i + 1) : i + 1);
+      const createdAt = log.CreatedAt || log.created_at || log.createdAt;
+      const timestamp = createdAt ? new Date(createdAt).toLocaleString() : "-";
       const row = `
         <tr class="border-b hover:bg-slate-50 transition">
-          <td class="py-3 px-4">${i + 1}</td>
-          <td class="py-3 px-4 text-slate-700">${log.initiator_name || log.User || "-"}</td>
-          <td class="py-3 px-4 text-slate-700">${log.Action || "-"}</td>
-          <td class="py-3 px-4 text-slate-700">${log.ResourceType || "-"}</td>
-          <td class="py-3 px-4 text-slate-700">${log.IP || "-"}</td>
-          <td class="py-3 px-4 text-slate-500">${new Date(log.CreatedAt).toLocaleString()}</td>
+          <td class="py-3 px-4">${number}</td>
+          <td class="py-3 px-4 text-slate-700">${log.initiator_name || log.InitiatorName || "-"}</td>
+          <td class="py-3 px-4 text-slate-700">${log.Action || log.action || "-"}</td>
+          <td class="py-3 px-4 text-slate-700">${log.ResourceType || log.resource_type || "-"}</td>
+          <td class="py-3 px-4 text-slate-700">${log.IP || log.ip || "-"}</td>
+          <td class="py-3 px-4 text-slate-500">${timestamp}</td>
         </tr>`;
       table.insertAdjacentHTML("beforeend", row);
     });
+
+    let nextCursor = data.next_cursor ?? data.nextCursor ?? null;
+    if (!nextCursor && logs.length === auditState.limit) {
+      const last = logs[logs.length - 1];
+      if (last) nextCursor = last.ID ?? last.id ?? null;
+    }
+    auditState.nextCursor = nextCursor ? String(nextCursor) : null;
+    setCookieValue("audit_next_cursor", auditState.nextCursor || "");
+
+    updateAuditControls(logs.length);
   } catch (err) {
     console.error("Failed to load audit logs:", err);
     table.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-red-500">Failed to load audit logs.</td></tr>`;
+    auditState.nextCursor = null;
+    updateAuditControls(0);
   }
 }
-
-// Hook refresh button
-document.addEventListener("DOMContentLoaded", () => {
-  if (document.getElementById("refreshAudit")) {
-    loadAuditLogs();
-    document.getElementById("refreshAudit").addEventListener("click", loadAuditLogs);
-  }
-});
 
 
 // --------------------------- LOGOUT HANDLER --------------------------- //
