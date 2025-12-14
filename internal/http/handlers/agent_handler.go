@@ -9,10 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"teleport_lite/internal/models"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
-	"teleport_lite/internal/models"
 )
 
 // RegisterAgent registers a remote agent in the database

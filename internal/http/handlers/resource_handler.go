@@ -3,16 +3,18 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+
 	//"os"
 	//"os/user"
 	//"strings"
 	"time"
 
+	"teleport_lite/internal/auth"
+	"teleport_lite/internal/models"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
-	"teleport_lite/internal/auth"
-	"teleport_lite/internal/models"
 )
 
 func ListResources(db *gorm.DB) gin.HandlerFunc {
