@@ -12,6 +12,7 @@
           class="px-3 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg shadow transition">
           ➕ Add Resource
         </button>
+        <!-- Generate Token merged into Add Resource modal -->
         <a href="/dashboard"
           class="px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition shadow-sm">
           ← Back to Dashboard
@@ -46,14 +47,47 @@
         <!-- Step 1: Download -->
         <div class="mb-6">
           <p class="text-sm text-gray-700 font-medium mb-2">1️⃣ Download the Teleport Agent:</p>
-          <div class="flex items-center justify-between bg-gray-100 border rounded-xl px-4 py-3">
-            <p class="text-sm text-gray-800 truncate">teleport-agent.tar.gz</p>
-            <button
-              id="downloadAgent"
-              class="ml-3 bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded transition"
-            >
-              Download
-            </button>
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 bg-gray-100 border rounded-xl px-4 py-3">
+            <div class="flex-1">
+              <p class="text-sm text-gray-800 truncate">Agent build</p>
+              <select id="agentArchSelect" class="mt-2 w-full sm:w-64 border border-slate-300 rounded px-3 py-2 text-sm bg-white">
+                <option value="linux-amd64">Linux - amd64</option>
+                <option value="linux-arm64">Linux - arm64</option>
+              </select>
+            </div>
+            <div class="flex items-center">
+              <button
+                id="downloadAgent"
+                class="ml-3 bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded transition"
+              >
+                Download
+              </button>
+            </div>
+          </div>
+          <p class="text-xs text-slate-500 mt-2">Choose the correct build for your machine. Use the sample run command below after extraction.</p>
+        </div>
+        <!-- Inline: Generate Token (merged) -->
+        <div class="mb-4">
+          <p class="text-sm text-gray-700 font-medium mb-2">🔑 Generate registration token (optional)</p>
+          <div class="flex items-center gap-2 mb-2">
+            <button id="showAddGenTokenSection" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Generate Token</button>
+            <span class="text-sm text-slate-500">Create a one-time token to register an agent for a resource.</span>
+          </div>
+          <div id="addGenTokenSection" class="hidden border rounded-lg p-3 bg-slate-50">
+            <div class="mb-2">
+              <label class="block text-sm mb-1">TTL (minutes, 0 = no expiry)</label>
+              <input id="addGenTokenTTL" type="number" min="0" value="60" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div id="addGenTokenResult" class="hidden bg-white border border-slate-200 rounded p-3 mb-2">
+              <p class="text-sm text-slate-700 mb-2">Token (copy this now — it will not be shown again):</p>
+              <div class="flex items-center gap-2">
+                <code id="addGenTokenValue" class="font-mono break-all text-sm p-2 bg-white rounded border w-full"></code>
+                <button id="copyAddGenToken" class="px-3 py-1.5 bg-blue-600 text-white rounded">Copy</button>
+              </div>
+            </div>
+            <div class="flex justify-end gap-2">
+              <button id="createAddTokenBtn" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Create Token</button>
+            </div>
           </div>
         </div>
 
@@ -134,6 +168,10 @@
           </div>
         </div>
 </div>
+ 
+ 
+ 
+<!-- (Token UI merged into Add Resource modal above) -->
 {{ end }}
 
 {{ template "layout" . }}

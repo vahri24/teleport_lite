@@ -130,5 +130,19 @@
   </div>
 </div>
 
+  <!-- Assign Access Modal (move from resources) -->
+  <div id="assignAccessModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-xl w-96 p-6">
+      <h3 class="text-lg font-semibold mb-4">Assign Resource Access to User</h3>
+      <div id="assignAccessInfo" class="text-sm text-slate-600 mb-3"></div>
+        <div class="text-xs text-slate-500 mb-2">Optional: specify an SSH username for the selected resource in the <code class="font-mono">connect_user</code> field. If left blank, user will choose from available SSH identities at connect time.</div>
+        <div id="assignAccessList" class="max-h-48 overflow-auto mb-3">Loading resources...</div>
+      <div class="flex justify-end gap-2">
+        <button id="assignAccessCancel" class="px-3 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+        <button id="assignAccessSave" class="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Save</button>
+      </div>
+    </div>
+  </div>
+
 {{ end }}
 {{ template "layout" . }}

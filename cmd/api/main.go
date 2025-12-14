@@ -27,6 +27,8 @@ func main() {
 		&models.Role{},
 		&models.Permission{},
 		&models.Resource{},
+		&models.UserResourceAccess{},
+		&models.RegistrationToken{},
 		&models.AccessRule{},
 		&models.AuditLog{},
 	)

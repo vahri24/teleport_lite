@@ -111,7 +111,7 @@ func startHeartbeat(gdb *gorm.DB, host string) {
 			}).Error
 		if err != nil {
 			log.Printf("⚠️ Heartbeat update failed: %v", err)
-		} 
+		}
 	}
 }
 

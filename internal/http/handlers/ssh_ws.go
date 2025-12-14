@@ -11,10 +11,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/ssh"
-	"gorm.io/gorm"
 	"gorm.io/datatypes"
-	"teleport_lite/internal/models"
+	"gorm.io/gorm"
 	"teleport_lite/internal/auth"
+	"teleport_lite/internal/models"
 )
 
 var upgrader = websocket.Upgrader{
@@ -47,7 +47,6 @@ func SSHWS(gdb *gorm.DB) gin.HandlerFunc {
 		// ✅ Extract user agent from request
 		userAgent := c.Request.Header.Get("User-Agent")
 
-
 		// ✅ Extract user info from JWT
 		var userID, orgID int64
 		var webUserName, webUserEmail string
@@ -60,35 +59,35 @@ func SSHWS(gdb *gorm.DB) gin.HandlerFunc {
 
 		var dbUser models.User
 		if err := gdb.First(&dbUser, userID).Error; err == nil {
-		    webUserName = dbUser.Name
-		    webUserEmail = dbUser.Email
+			webUserName = dbUser.Name
+			webUserEmail = dbUser.Email
 		} else {
-		    webUserName = "Unknown"
-}
+			webUserName = "Unknown"
+		}
 
 		// ✅ Detect client IP
 		clientIP, _, _ := net.SplitHostPort(c.Request.RemoteAddr)
 
 		// ✅ Prepare metadata JSON
 		meta := map[string]string{
-			"ssh_user": user,
-			"host":     host,
-			"initiator":  webUserName,
-    		"initiator_email": webUserEmail,
+			"ssh_user":        user,
+			"host":            host,
+			"initiator":       webUserName,
+			"initiator_email": webUserEmail,
 		}
 		metaJSON, _ := json.Marshal(meta)
 
 		// ✅ Record SSH connect
 		connectLog := models.AuditLog{
-			OrgID:        	orgID,
-			UserID:       	userID,
-			Action:       	"ssh_connect",
-			ResourceType: 	"SSH",
-			IP:           	clientIP,
-			UserAgent:     	userAgent,
-			InitiatorName: 	webUserName,
-			Metadata:     	datatypes.JSON(metaJSON),
-			CreatedAt:    	time.Now(),
+			OrgID:         orgID,
+			UserID:        userID,
+			Action:        "ssh_connect",
+			ResourceType:  "SSH",
+			IP:            clientIP,
+			UserAgent:     userAgent,
+			InitiatorName: webUserName,
+			Metadata:      datatypes.JSON(metaJSON),
+			CreatedAt:     time.Now(),
 		}
 		_ = gdb.Create(&connectLog).Error
 
@@ -190,15 +189,15 @@ func SSHWS(gdb *gorm.DB) gin.HandlerFunc {
 
 		// ✅ Record SSH disconnect when session ends
 		disconnectLog := models.AuditLog{
-			OrgID:        	orgID,
-			UserID:       	userID,
-			Action:       	"ssh_disconnect",
-			ResourceType: 	"SSH",
-			IP:           	clientIP,
-			UserAgent:     	userAgent,
-			InitiatorName: 	webUserName,
-			Metadata:     	datatypes.JSON(metaJSON),
-			CreatedAt:    	time.Now(),
+			OrgID:         orgID,
+			UserID:        userID,
+			Action:        "ssh_disconnect",
+			ResourceType:  "SSH",
+			IP:            clientIP,
+			UserAgent:     userAgent,
+			InitiatorName: webUserName,
+			Metadata:      datatypes.JSON(metaJSON),
+			CreatedAt:     time.Now(),
 		}
 		_ = gdb.Create(&disconnectLog).Error
 

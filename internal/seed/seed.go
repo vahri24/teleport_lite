@@ -45,6 +45,7 @@ func FirstSetup(db *gorm.DB) error {
 		{Key: "roles:read", Description: "View roles", Resource: "roles", Action: "read"},
 		{Key: "roles:write", Description: "Manage roles", Resource: "roles", Action: "write"},
 		{Key: "resources:read", Description: "View resources", Resource: "resources", Action: "read"},
+		{Key: "resources:generate-token", Description: "Generate registration tokens", Resource: "resources", Action: "generate-token"},
 		{Key: "resources:write", Description: "Manage resources", Resource: "resources", Action: "write"},
 		{Key: "audit:read", Description: "View audit logs", Resource: "audit", Action: "read"},
 	}
@@ -79,7 +80,7 @@ func FirstSetup(db *gorm.DB) error {
 	}
 
 	// DevOps: manage resources + read audit + read roles/users
-	devopsKeys := []string{"resources:read", "resources:write", "audit:read", "roles:read", "users:read"}
+	devopsKeys := []string{"resources:read", "resources:generate-token", "resources:write", "audit:read", "roles:read", "users:read"}
 	for _, k := range devopsKeys {
 		if err := ensureRolePerm(devopsRole.ID, permIDs[k]); err != nil {
 			return err

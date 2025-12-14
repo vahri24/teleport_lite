@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"teleport_lite/internal/auth"
 	"teleport_lite/internal/models"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -264,6 +267,97 @@ func ListConnectUsers(db *gorm.DB) gin.HandlerFunc {
 			"email":        user.Email,
 			"connect_user": userList,
 		})
+	}
+}
+
+// UpdateUserAccess allows an admin to set resource access entries for a user.
+// Expected JSON: { "access": [{ "resource_id": 3, "connect_user": "root" }, ...] }
+func UpdateUserAccess(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+
+		var payload struct {
+			Access []struct {
+				ResourceID  int64  `json:"resource_id"`
+				ConnectUser string `json:"connect_user"`
+			} `json:"access"`
+		}
+		if err := c.ShouldBindJSON(&payload); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var user models.User
+		if err := db.First(&user, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			return
+		}
+
+		// Simple approach: delete existing mappings for this user in same org, then insert new ones
+		tx := db.Begin()
+		if tx.Error != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": tx.Error.Error()})
+			return
+		}
+
+		if err := tx.Exec("DELETE FROM user_resource_accesses WHERE user_id = ? AND org_id = ?", user.ID, user.OrgID).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		for _, a := range payload.Access {
+			ura := models.UserResourceAccess{
+				OrgID:       uint64(user.OrgID),
+				UserID:      user.ID,
+				ResourceID:  uint64(a.ResourceID),
+				ConnectUser: a.ConnectUser,
+			}
+			if err := tx.Create(&ura).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Audit log
+		// Try to find initiator name
+		var initiatorName string
+		if claimsI, ok := c.Get("claims"); ok {
+			if cl, ok := claimsI.(*auth.Claims); ok {
+				var u models.User
+				if err := db.First(&u, cl.UserID).Error; err == nil {
+					initiatorName = u.Name
+				}
+			}
+		}
+		// Build metadata for audit
+		// Use simple JSON via datatypes
+		metaEntries := make([]map[string]interface{}, 0, len(payload.Access))
+		for _, a := range payload.Access {
+			metaEntries = append(metaEntries, map[string]interface{}{"resource_id": a.ResourceID, "connect_user": a.ConnectUser})
+		}
+		metaJSON, _ := json.Marshal(metaEntries)
+		audit := models.AuditLog{
+			OrgID:         int64(user.OrgID),
+			UserID:        0,
+			Action:        "user.assign_access",
+			ResourceType:  "user",
+			ResourceID:    user.ID,
+			Metadata:      datatypes.JSON(metaJSON),
+			IP:            c.ClientIP(),
+			UserAgent:     c.GetHeader("User-Agent"),
+			InitiatorName: initiatorName,
+			CreatedAt:     time.Now(),
+		}
+		_ = db.Create(&audit).Error
+
+		c.JSON(http.StatusOK, gin.H{"message": "access updated"})
 	}
 }
 

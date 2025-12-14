@@ -19,13 +19,45 @@ import (
 // and automatically adds its public key to authorized_keys
 func RegisterAgent(gdb *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Require a registration token. If AGENT_REG_TOKEN env var is set
+		// the request must include that value. Otherwise the token must
+		// match an entry in the RegistrationToken table.
+		token := c.GetHeader("X-Registration-Token")
+		if token == "" {
+			token = c.Query("token")
+		}
+		expected := os.Getenv("AGENT_REG_TOKEN")
+		var matchedToken models.RegistrationToken
+		var foundToken bool
+		if expected != "" {
+			if token == "" || token != expected {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid registration token"})
+				return
+			}
+		} else {
+			if token == "" {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "registration token required"})
+				return
+			}
+			// Look up token in DB
+			if err := gdb.Where("token = ? AND used = false", token).First(&matchedToken).Error; err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or used registration token"})
+				return
+			}
+			// Check expiry
+			if matchedToken.ExpiresAt != nil && matchedToken.ExpiresAt.Before(time.Now()) {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "registration token expired"})
+				return
+			}
+			foundToken = true
+		}
 		var req struct {
-			Hostname  string `json:"hostname"`
-			IP        string `json:"ip"`
-			OS        string `json:"os"`
-			PublicKey string `json:"public_key"`
+			Hostname   string `json:"hostname"`
+			IP         string `json:"ip"`
+			OS         string `json:"os"`
+			PublicKey  string `json:"public_key"`
 			PrivateKey string `json:"private_key"`
-			Role      string `json:"role"`
+			Role       string `json:"role"`
 		}
 
 		// ✅ Parse incoming JSON
@@ -40,7 +72,7 @@ func RegisterAgent(gdb *gorm.DB) gin.HandlerFunc {
 			"os":       req.OS,
 			"role":     req.Role,
 		}
-		
+
 		metaJSON, _ := json.Marshal(meta)
 
 		// ✅ Prepare resource struct
@@ -72,6 +104,15 @@ func RegisterAgent(gdb *gorm.DB) gin.HandlerFunc {
 				"error": "agent registered but failed to append key: " + err.Error(),
 			})
 			return
+		}
+
+		// If a DB token was used, mark it as used and associate with resource
+		if foundToken {
+			matchedToken.Used = true
+			matchedToken.ResourceID = &resource.ID
+			if err := gdb.Save(&matchedToken).Error; err != nil {
+				log.Printf("⚠️ failed to mark token used: %v", err)
+			}
 		}
 
 		log.Printf("✅ Agent %s (%s) registered and key added.", req.Hostname, req.IP)

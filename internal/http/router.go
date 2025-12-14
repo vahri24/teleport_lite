@@ -113,6 +113,12 @@ func NewRouter(db *gorm.DB, jwtSecret string) *gin.Engine {
 
 		// Resources
 		api.GET("/resources", require(chk, "resources:read"), handlers.ListResources(db))
+		// Registration tokens for agents/resources (requires generate-token permission)
+		api.POST("/agents/tokens", require(chk, "resources:generate-token"), handlers.CreateRegistrationToken(db))
+		// Assign SSH users to a resource (admin only)
+		api.POST("/resources/:id/users", require(chk, "users:assign-role"), handlers.UpdateResourceUsers(db))
+		// Assign resource access to a user (admin only)
+		api.POST("/users/:id/access", require(chk, "users:assign-role"), handlers.UpdateUserAccess(db))
 		//api.GET("/resources/local", require(chk, "resources:read"), handlers.GetLocalResource)
 		api.POST("/resources", require(chk, "resources:write"), createResource(db))
 

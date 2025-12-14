@@ -206,6 +206,7 @@ async function loadUsers() {
       const actionBtn = `
         <div class="flex items-center gap-2">
           ${isSuspended ? (activateBtn + changePwdBtn) : (deactivateBtn + changePwdBtn)}
+          <button data-user-id="${uid}" class="assign-access-btn ${showAction ? '' : 'hidden'} px-3 py-1.5 rounded bg-indigo-600 text-white text-xs hover:bg-indigo-700">Assign Access</button>
         </div>`;
 
       const row = `
@@ -225,10 +226,21 @@ async function loadUsers() {
     attachDeactivateHandlers();
     attachActivateHandlers();
     attachChangePasswordHandlers();
+    attachAssignAccessHandlers();
   } catch (err) {
     console.error("Failed to load users:", err);
     table.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-red-500">Failed to load users.</td></tr>`;
   }
+}
+
+function attachAssignAccessHandlers() {
+  document.querySelectorAll('.assign-access-btn').forEach(btn => {
+    btn.onclick = async (e) => {
+      const userId = e.currentTarget.dataset.userId;
+      if (!userId) return;
+      await openAssignAccessModal(userId);
+    };
+  });
 }
 
 function updateUserActionVisibility() {
@@ -242,6 +254,10 @@ function updateUserActionVisibility() {
     else btn.classList.add('hidden');
   });
   document.querySelectorAll('.change-pwd-btn').forEach(btn => {
+    if (allowed) btn.classList.remove('hidden');
+    else btn.classList.add('hidden');
+  });
+  document.querySelectorAll('.assign-access-btn').forEach(btn => {
     if (allowed) btn.classList.remove('hidden');
     else btn.classList.add('hidden');
   });
@@ -366,7 +382,24 @@ function setupAddUserModal() {
   const cancelBtn = document.getElementById("cancelAddUser");
   const form = document.getElementById("addUserForm");
 
-  if (showBtn && modal) showBtn.addEventListener("click", () => modal.classList.remove("hidden"));
+  if (showBtn && modal) showBtn.addEventListener("click", () => {
+    modal.classList.remove("hidden");
+    try {
+      const archSel = document.getElementById('agentArchSelect');
+      const arch = archSel ? archSel.value : 'linux-amd64';
+      const binaryName = `teleport-agent-${arch}`;
+      const tarName = `${binaryName}.tar.gz`;
+      const extractEl = document.getElementById('cmdExtract');
+      const runEl = document.getElementById('cmdRun');
+      if (extractEl) extractEl.innerText = `tar -xzf ${tarName}`;
+      // include token if already created
+      const tokenEl = document.getElementById('addGenTokenValue');
+      const token = tokenEl ? tokenEl.textContent.trim() : '';
+      if (runEl) runEl.innerText = token ? `CONTROLLER_URL=${window.location.origin} AGENT_REG_TOKEN=${token} ./${binaryName}` : `CONTROLLER_URL=${window.location.origin} ./${binaryName}`;
+    } catch (e) {
+      console.warn('Failed to set extract/run commands on modal open', e);
+    }
+  });
   if (cancelBtn && modal) cancelBtn.addEventListener("click", () => modal.classList.add("hidden"));
 
   if (form) {
@@ -427,10 +460,12 @@ async function loadLocalResources() {
                 <h3 class="text-slate-800 font-semibold">${r.Name}</h3>
                 <p class="text-xs text-slate-500">${r.Host}</p>
               </div>
-              <button class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg connect-btn"
-                      data-host="${r.Host}">
-                Connect
-              </button>
+                  <div class="flex items-center gap-2">
+                    <button class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg connect-btn"
+                            data-host="${r.Host}" data-resource-id="${r.ID}">
+                      Connect
+                    </button>
+                  </div>
             </div>
             <p class="text-xs text-slate-600">${osVersion}</p>
           </div>
@@ -438,7 +473,7 @@ async function loadLocalResources() {
       })
       .join("");
 
-    // Attach connect handlers
+    // Attach connect handlers (open modal even if no users; modal will disable Connect if none)
     document.querySelectorAll(".connect-btn").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         // If user doesn't have resource write permission, show popup and don't navigate
@@ -473,30 +508,136 @@ async function showUserSelectModal(host) {
     const data = await res.json();
 
     select.innerHTML = "";
-    if (data.connect_user && data.connect_user.length > 0) {
+    const hasUsers = data.connect_user && data.connect_user.length > 0;
+    if (hasUsers) {
       data.connect_user.forEach((u) => {
         const opt = document.createElement("option");
         opt.value = u;
         opt.textContent = u;
         select.appendChild(opt);
       });
+      confirmBtn.disabled = false;
     } else {
       const opt = document.createElement("option");
       opt.textContent = "No SSH users available";
       select.appendChild(opt);
+      confirmBtn.disabled = true;
     }
   } catch (err) {
     console.error("Failed to load SSH users:", err);
     select.innerHTML = "<option>Error loading users</option>";
+    confirmBtn.disabled = true;
   }
 
   cancelBtn.onclick = () => modal.classList.add("hidden");
 
   confirmBtn.onclick = () => {
+    if (confirmBtn.disabled) return;
     const selectedUser = select.value;
     modal.classList.add("hidden");
     openSSH(host, selectedUser);
   };
+}
+
+// --------------------------- ASSIGN ACCESS MODAL (ADMIN) --------------------------- //
+async function openAssignAccessModal(userId) {
+  const modal = document.getElementById('assignAccessModal');
+  const info = document.getElementById('assignAccessInfo');
+  const listEl = document.getElementById('assignAccessList');
+  const saveBtn = document.getElementById('assignAccessSave');
+  const cancelBtn = document.getElementById('assignAccessCancel');
+
+  if (!modal || !listEl || !saveBtn || !cancelBtn) return;
+  modal.classList.remove('hidden');
+  info.textContent = `User ID: ${userId}`;
+  listEl.innerHTML = 'Loading resources...';
+
+  try {
+    const [rRes, uRes] = await Promise.all([
+      fetch('/api/v1/resources', { credentials: 'include' }),
+      fetch('/api/v1/users', { credentials: 'include' }),
+    ]);
+    const rData = await rRes.json();
+    const uData = await uRes.json();
+    const resources = rData.resources || [];
+    const users = uData.users || [];
+    const user = users.find(uu => String(uu.ID) === String(userId) || String(uu.id) === String(userId));
+    const assigned = user && (user.access_resources || user.resource_access || user.resources) ? (user.access_resources || user.resource_access || user.resources) : [];
+
+    listEl.innerHTML = '';
+    resources.forEach(r => {
+      const id = `assign_res_${r.ID}`;
+      // assigned may be array of ids or array of objects {resource_id, connect_user}
+      let isChecked = false;
+      let preUser = '';
+      if (Array.isArray(assigned)) {
+        assigned.forEach(a => {
+          if (typeof a === 'number' || typeof a === 'string') {
+            if (String(a) === String(r.ID)) isChecked = true;
+          } else if (a && (a.resource_id || a.resourceId || a.id)) {
+            const rid = a.resource_id || a.resourceId || a.id;
+            if (String(rid) === String(r.ID)) {
+              isChecked = true;
+              preUser = a.connect_user || a.connectUser || a.username || '';
+            }
+          }
+        });
+      }
+
+      const item = document.createElement('div');
+      item.className = 'flex items-center gap-2 py-1';
+      item.innerHTML = `
+        <input type="checkbox" id="${id}" data-resource-id="${r.ID}" ${isChecked ? 'checked' : ''} />
+        <label for="${id}" class="text-sm flex-1">${r.Name} (${r.Host})</label>
+        <input type="text" placeholder="connect_user (optional)" class="connect-user-input border rounded px-2 py-1 text-sm w-36" data-resource-id="${r.ID}" value="${preUser}">
+      `;
+      listEl.appendChild(item);
+    });
+
+    cancelBtn.onclick = () => modal.classList.add('hidden');
+
+    saveBtn.onclick = async () => {
+      const checked = Array.from(listEl.querySelectorAll('input[type=checkbox]:checked'));
+      const access = checked.map(c => {
+        const rid = Number(c.getAttribute('data-resource-id'));
+        const input = listEl.querySelector(`input.connect-user-input[data-resource-id="${rid}"]`);
+        const username = input ? input.value.trim() : '';
+        return { resource_id: rid, connect_user: username };
+      }).filter(a => a.resource_id);
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+      try {
+        const res = await fetch(`/api/v1/users/${encodeURIComponent(userId)}/access`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ access }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Failed to save: ' + (data.error || data.message || res.statusText));
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save';
+          return;
+        }
+        modal.classList.add('hidden');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+        // refresh users view to reflect changes
+        await loadUsers();
+        alert('Access updated');
+      } catch (err) {
+        console.error('Failed to save access', err);
+        alert('Network error saving access');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+      }
+    };
+
+  } catch (err) {
+    console.error('Failed to load resources/users for access assignment', err);
+    listEl.innerHTML = '<div class="text-sm text-red-600">Failed to load resources</div>';
+  }
 }
 
 // --------------------------- SSH CONNECT --------------------------- //
@@ -566,7 +707,106 @@ function setupAddResourceModal() {
   if (showBtn && modal) showBtn.addEventListener("click", () => modal.classList.remove("hidden"));
   if (cancelBtn && modal) cancelBtn.addEventListener("click", () => modal.classList.add("hidden"));
 
+  // Token UI inside Add Resource modal
+  const showTokenSectionBtn = document.getElementById('showAddGenTokenSection');
+  const tokenSection = document.getElementById('addGenTokenSection');
+  const ttlInput = document.getElementById('addGenTokenTTL');
+  const resultWrap = document.getElementById('addGenTokenResult');
+  const resultVal = document.getElementById('addGenTokenValue');
+  const createBtn = document.getElementById('createAddTokenBtn');
+  const copyBtn = document.getElementById('copyAddGenToken');
+
+  if (showTokenSectionBtn && tokenSection) {
+    showTokenSectionBtn.addEventListener('click', async () => {
+      // toggle visibility
+      tokenSection.classList.toggle('hidden');
+
+      // (resource selection removed) reset result area and TTL
+      // reset result area
+      if (resultWrap) resultWrap.classList.add('hidden');
+      if (resultVal) resultVal.textContent = '';
+      if (ttlInput) ttlInput.value = '60';
+    });
+  }
+
+  if (createBtn) createBtn.addEventListener('click', async () => {
+    const allowed = Array.isArray(window.currentUserPermissions) && window.currentUserPermissions.includes('resources:generate-token');
+    if (!allowed) {
+      alert('You are not authorized to create registration tokens');
+      return;
+    }
+
+    const ttl = ttlInput ? parseInt(ttlInput.value || '0', 10) : 0;
+    const payload = { resource_id: null, ttl_minutes: Number.isFinite(ttl) ? ttl : 0 };
+
+    try {
+      createBtn.disabled = true;
+      createBtn.textContent = 'Creating...';
+      const res = await fetch('/api/v1/agents/tokens', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // show server error message in-place if possible
+        const errMsg = data && (data.error || data.message) ? (data.error || data.message) : (res.statusText || 'Failed to create token');
+        if (resultWrap) {
+          resultWrap.classList.remove('hidden');
+          if (resultVal) resultVal.textContent = errMsg;
+        } else {
+          alert('Failed to create token: ' + errMsg);
+        }
+        createBtn.disabled = false;
+        createBtn.textContent = 'Create Token';
+        return;
+      }
+
+      const tokenText = data.token || data.Token || '';
+      if (resultVal) resultVal.textContent = tokenText;
+      if (resultWrap) resultWrap.classList.remove('hidden');
+      // update extract and run command to include token and selected arch
+      try {
+        const archSel = document.getElementById('agentArchSelect');
+        const arch = archSel ? archSel.value : 'linux-amd64';
+        const binaryName = `teleport-agent-${arch}`;
+        const tarName = `${binaryName}.tar.gz`;
+        const extractEl = document.getElementById('cmdExtract');
+        const runEl = document.getElementById('cmdRun');
+        if (extractEl) extractEl.innerText = `tar -xzf ${tarName}`;
+        if (runEl) runEl.innerText = `CONTROLLER_URL=${window.location.origin} AGENT_REG_TOKEN=${tokenText} ./${binaryName}`;
+      } catch (e) {
+        console.warn('Failed to update run commands with token', e);
+      }
+      createBtn.disabled = false;
+      createBtn.textContent = 'Create Token';
+    } catch (err) {
+      console.error('Create token failed', err);
+      alert('Network error creating token');
+      createBtn.disabled = false;
+      createBtn.textContent = 'Create Token';
+    }
+  });
+
+  if (copyBtn) copyBtn.addEventListener('click', async () => {
+    try {
+      const text = resultVal ? resultVal.textContent.trim() : '';
+      if (!text) return;
+      await navigator.clipboard.writeText(text);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => (copyBtn.textContent = 'Copy'), 2000);
+    } catch (err) {
+      console.error('Copy failed', err);
+      copyBtn.textContent = 'Error';
+      setTimeout(() => (copyBtn.textContent = 'Copy'), 2000);
+    }
+  });
+
 }
+
+// --------------------------- GENERATE TOKEN MODAL --------------------------- //
+// previous standalone token modal removed — token UI is integrated into Add Resource modal
 
 // --------------------------- NO ACCESS MODAL --------------------------- //
 function setupNoAccessModal() {
@@ -724,19 +964,63 @@ document.addEventListener("DOMContentLoaded", () => {
     cmdRun.innerText = `CONTROLLER_URL=${controllerURL} ./teleport-agent`;
   }
 
-  // Handle file download
+  // Handle file download (multiple architectures)
   const downloadBtn = document.getElementById("downloadAgent");
+  const archSelect = document.getElementById("agentArchSelect");
+  if (archSelect) {
+    // Auto-detect user's arch and preselect if possible
+    try {
+      const ua = navigator.userAgent || "";
+      const platform = navigator.platform || "";
+      // simple heuristics
+      if (/arm|aarch64/i.test(ua) || /arm|aarch64/i.test(platform)) archSelect.value = 'linux-arm64';
+      else archSelect.value = 'linux-amd64';
+    } catch (e) {}
+    // update extract/run commands when arch changes
+    archSelect.addEventListener('change', () => {
+      const arch = archSelect.value || 'linux-amd64';
+      const extractEl = document.getElementById('cmdExtract');
+      const runEl = document.getElementById('cmdRun');
+      const binaryName = `teleport-agent-${arch}`;
+      const tarName = `${binaryName}.tar.gz`;
+      if (extractEl) extractEl.innerText = `tar -xzf ${tarName}`;
+      // if token present, include it
+      const tokenEl = document.getElementById('addGenTokenValue');
+      const token = tokenEl ? tokenEl.textContent.trim() : '';
+      if (runEl) runEl.innerText = token ? `CONTROLLER_URL=${window.location.origin} AGENT_REG_TOKEN=${token} ./${binaryName}` : `CONTROLLER_URL=${window.location.origin} ./${binaryName}`;
+    });
+    // initialize extract/run commands for the current arch selection
+    try {
+      const arch0 = archSelect.value || 'linux-amd64';
+      const binaryName0 = `teleport-agent-${arch0}`;
+      const tarName0 = `${binaryName0}.tar.gz`;
+      const extractEl0 = document.getElementById('cmdExtract');
+      const runEl0 = document.getElementById('cmdRun');
+      if (extractEl0) extractEl0.innerText = `tar -xzf ${tarName0}`;
+      const tokenEl0 = document.getElementById('addGenTokenValue');
+      const token0 = tokenEl0 ? tokenEl0.textContent.trim() : '';
+      if (runEl0) runEl0.innerText = token0 ? `CONTROLLER_URL=${window.location.origin} AGENT_REG_TOKEN=${token0} ./${binaryName0}` : `CONTROLLER_URL=${window.location.origin} ./${binaryName0}`;
+    } catch (e) {
+      console.warn('Failed to initialize extract/run commands', e);
+    }
+  }
+
   if (downloadBtn) {
     downloadBtn.addEventListener("click", async () => {
       try {
-        const response = await fetch("/internal/shared/teleport-agent.tar.gz");
-        if (!response.ok) throw new Error("File not found or inaccessible.");
+        const arch = (archSelect && archSelect.value) ? archSelect.value : 'linux-amd64';
+        // Map to file name convention
+        const filename = `teleport-agent-${arch}.tar.gz`;
+        const path = `/internal/shared/${filename}`;
+
+        const response = await fetch(path);
+        if (!response.ok) throw new Error("File not found or inaccessible: " + path);
 
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "teleport-agent.tar.gz";
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -747,6 +1031,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setTimeout(() => (downloadBtn.textContent = "Download"), 2000);
       } catch (err) {
         console.error("Download failed:", err);
+        alert('Failed to download agent: ' + (err.message || err));
         downloadBtn.textContent = "Error";
         downloadBtn.classList.replace("bg-green-600", "bg-red-600");
       }

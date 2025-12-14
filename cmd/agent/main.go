@@ -120,7 +120,19 @@ func main() {
 	}
 
 	body, _ := json.Marshal(payload)
-	resp, err := http.Post(controllerURL+"/agents/register", "application/json", bytes.NewReader(body))
+	// Create request so we can attach registration token header if provided
+	reqURL := controllerURL + "/agents/register"
+	req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewReader(body))
+	if err != nil {
+		log.Fatalf("❌ failed to create register request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if tok := os.Getenv("AGENT_REG_TOKEN"); tok != "" {
+		req.Header.Set("X-Registration-Token", tok)
+	}
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Fatalf("❌ register failed: %v", err)
 	}
@@ -136,7 +148,13 @@ func main() {
 	for {
 		time.Sleep(60 * time.Second)
 		hb, _ := json.Marshal(map[string]string{"ip": ip})
-		http.Post(controllerURL+"/agents/heartbeat", "application/json", bytes.NewReader(hb))
+		hbReq, _ := http.NewRequest(http.MethodPost, controllerURL+"/agents/heartbeat", bytes.NewReader(hb))
+		hbReq.Header.Set("Content-Type", "application/json")
+		if tok := os.Getenv("AGENT_REG_TOKEN"); tok != "" {
+			hbReq.Header.Set("X-Registration-Token", tok)
+		}
+		client := &http.Client{Timeout: 10 * time.Second}
+		client.Do(hbReq)
 	}
 }
 
